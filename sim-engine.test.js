@@ -217,4 +217,46 @@ E.checkPositions(s, { BTC: 100, ETH: 100 });
 assert.equal(s.pos.length, 300, '다른 코인과 같은 코인 포지션이 공존');
 assert.equal(new Set(s.pos.map(x => x.id)).size, 300, '포지션마다 별도 번호');
 
+// 계좌 요약: 미실현·수익률·마진 잔고·실현 손익
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'long', margin: 100, lev: 10, price: 100 });
+E.openPos(s, { sym: 'ETH', side: 'short', margin: 50, lev: 2, price: 10 });
+let sum = E.positionSummary(s, 'USDT', { BTC: 110, ETH: 10 });
+near(sum.unreal, 100, '롱 10배 10% 상승이면 미실현 +100');
+near(sum.margin, 150, '투입 마진 합계');
+near(sum.roe, 100 / 150 * 100, '수익률은 투입 마진 대비');
+near(sum.avail, 10000 - 100.2 - 50.02, '사용 가능');
+near(sum.balance, sum.avail + 150 + 100, '마진 잔고 = 사용 가능 + 마진 + 미실현');
+near(sum.realized, 0, '청산 전 실현 손익 0');
+assert.equal(sum.count, 2);
+E.closePos(s, p.id, 110);
+near(E.positionSummary(s, 'USDT', { BTC: 110, ETH: 10 }).realized, 100 - 0.22 - 0.2, '실현 손익은 양쪽 수수료 차감');
+near(E.positionSummary(s, 'USDT', { ETH: 12 }).unreal, -20, '숏은 가격 상승 시 손실');
+near(E.positionSummary(s, 'USDT', {}).unreal, 0, '가격이 없는 종목은 미실현에서 제외');
+
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'long', margin: 100, lev: 10, price: 100 });
+E.toggleAuto(s, p.id);
+E.checkPositions(s, { BTC: 80 });
+assert.equal(s.pos.length, 0, '자동 마진 끄면 강제 청산');
+near(E.positionSummary(s, 'USDT', {}).realized, -100.2, '강제 청산은 마진과 진입 수수료 손실');
+
+// 주문 미리보기
+let pv = E.orderPreview({ margin: 3000, lev: 10, price: 100, tp: 110, sl: 95 });
+near(pv.notional, 30000, '포지션 크기');
+near(pv.qty, 300, '수량');
+near(pv.fee, 6, '진입 수수료');
+near(pv.cost, 3006, '필요 금액');
+near(pv.liqLong, E.liqPrice('long', 100, 10, false), '롱 청산가');
+near(pv.liqShort, E.liqPrice('short', 100, 10, false), '숏 청산가');
+assert.equal(pv.side, 'long', '익절가가 위면 롱 기준');
+near(pv.tpPnl, 3000, '익절 시 손익');
+near(pv.slPnl, -1500, '손절 시 손익');
+pv = E.orderPreview({ margin: 100, lev: 2, price: 100, tp: 90 });
+assert.equal(pv.side, 'short', '익절가가 아래면 숏 기준');
+near(pv.tpPnl, 20, '숏 익절 손익');
+assert.equal(pv.slPnl, null, '손절가가 없으면 계산하지 않음');
+assert.equal(E.orderPreview({ margin: '', lev: 10, price: 100 }), null, '증거금이 비면 미리보기 없음');
+assert.equal(E.orderPreview({ margin: 100, lev: 10, price: 100 }).side, null, '익절·손절이 없으면 방향 미정');
+
 console.log('sim-engine: 모든 검사 통과');

@@ -116,9 +116,39 @@ function closePos(s, id, price, reason = '청산') {
   const [p] = s.pos.splice(i, 1);
   const pnl = posPnl(p, price);
   const fee = (p.inverse ? p.qty / price : p.qty * price) * FEE.futures;
-  credit(s, p.settle, Math.max(0, p.margin + pnl - fee));
+  const back = Math.max(0, p.margin + pnl - fee);
+  credit(s, p.settle, back);
+  addRealized(s, p, back - p.margin);
   log(s, '선물', `${p.sym} ${reason} @ ${price}, 손익 ${pnl.toFixed(4)} ${p.settle}`);
   return pnl;
+}
+// 실현 손익에는 진입·청산 수수료를 모두 포함한다
+function addRealized(s, p, net) {
+  const entryFee = (p.inverse ? p.qty / p.entry : p.qty * p.entry) * FEE.futures;
+  s.realized = s.realized || {};
+  s.realized[p.settle] = (s.realized[p.settle] || 0) + net - entryFee;
+}
+function positionSummary(s, settle, prices) {
+  let margin = 0, unreal = 0, count = 0;
+  for (const p of s.pos) {
+    if (p.settle !== settle) continue;
+    count++;
+    margin += p.margin;
+    if (prices[p.sym] > 0) unreal += posPnl(p, prices[p.sym]);
+  }
+  const avail = s.bal[settle] || 0;
+  return { count, margin, unreal, roe: margin > 0 ? unreal / margin * 100 : 0, avail, balance: avail + margin + unreal, realized: s.realized?.[settle] || 0 };
+}
+function orderPreview({ margin, lev, price, tp, sl, inverse = false }) {
+  margin = Number(margin); lev = Number(lev); price = Number(price); tp = Number(tp); sl = Number(sl);
+  if (!(margin > 0 && lev > 0 && price > 0)) return null;
+  const notional = margin * lev;
+  const qty = inverse ? notional * price : notional / price;
+  const fee = notional * FEE.futures;
+  // 방향을 고르기 전이라 익절가·손절가가 현재가 어느 쪽인지로 롱·숏을 판단한다
+  const side = tp > 0 ? (tp >= price ? 'long' : 'short') : sl > 0 ? (sl <= price ? 'long' : 'short') : null;
+  const at = x => side && x > 0 ? posPnl({ side, inverse, qty, entry: price }, x) : null;
+  return { notional, qty, fee, cost: margin + fee, liqLong: liqPrice('long', price, lev, inverse), liqShort: liqPrice('short', price, lev, inverse), side, tpPnl: at(tp), slPnl: at(sl) };
 }
 function findPos(s, id) {
   const p = s.pos.find(x => x.id === id);
@@ -172,6 +202,7 @@ function checkPositions(s, prices) {
     if (p.auto) guardMargin(s, p, x);
     if (long ? x <= p.liq : x >= p.liq) {
       s.pos.splice(s.pos.indexOf(p), 1);
+      addRealized(s, p, -p.margin);
       log(s, '선물', `${p.sym} 강제 청산 @ ${x}, 증거금 ${p.margin} ${p.settle} 소진`);
     } else if (p.tp && (long ? x >= p.tp : x <= p.tp)) closePos(s, p.id, x, '익절');
     else if (p.sl && (long ? x <= p.sl : x >= p.sl)) closePos(s, p.id, x, '손절');
@@ -333,7 +364,7 @@ function equity(s, prices) {
 }
 
 const SimEngine = {
-  FEE, START_USDT, newState, deposit, spotMarket, placeLimit, cancelOrder, matchOrders, liqPrice, openPos, posPnl, closePos, addMargin, toggleAuto, reversePos,
+  FEE, START_USDT, newState, deposit, spotMarket, placeLimit, cancelOrder, matchOrders, liqPrice, openPos, posPnl, closePos, positionSummary, orderPreview, addMargin, toggleAuto, reversePos,
   checkPositions, convert, accrued, stake, redeem, advanceDays, borrow, repay, createGrid, gridStep, createDca,
   follow, botValue, stopBot, claim, tick, equity, simNow,
 };

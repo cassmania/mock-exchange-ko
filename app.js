@@ -309,12 +309,14 @@ function viewFutures(el, pair, inverse, tabAi) {
 function drawFutures(sym, q, inverse, tabAi) {
   const settle = inverse ? sym : q;
   $('trade-side').innerHTML = `<div id="t-top" class="t-top"></div>
+    <div class="panel" id="acct"></div>
     <form class="panel form" id="fut">
       <h3 class="order-title">모의 주문</h3>
       <label>증거금 (${esc(settle)})<input name="margin" inputmode="decimal" required></label>
       <label>레버리지 <output id="levv">10배</output><input type="range" name="lev" min="1" max="200" value="10"></label>
       <div class="two"><label>익절가<input name="tp" inputmode="decimal" placeholder="선택"></label><label>손절가<input name="sl" inputmode="decimal" placeholder="선택"></label></div>
       <p class="muted" id="fut-bal"></p>
+      <div class="calc" id="fut-calc"></div>
       <div class="two"><button class="btn up-bg" value="long">롱 (매수)</button><button class="btn down-bg" value="short">숏 (매도)</button></div>
     </form>${tabAi ? '<div class="panel" id="ai"></div>' : ''}<div class="panel" id="book"></div>`;
   $('trade-bottom').innerHTML = '<div class="panel"><h3>포지션 <span class="muted" id="pos-n"></span></h3><div id="pos"></div></div>';
@@ -322,6 +324,10 @@ function drawFutures(sym, q, inverse, tabAi) {
   $('fut').lev.addEventListener('input', e => { $('levv').textContent = e.target.value + '배'; });
   liveId('book', () => bookHtml(sym));
   liveId('fut-bal', () => balLine(settle));
+  liveId('acct', () => acctHtml(settle));
+  const calc = () => calcHtml(sym, settle, inverse);
+  liveId('fut-calc', calc);
+  $('fut').addEventListener('input', () => { $('fut-calc').innerHTML = calc(); });
   liveId('pos-n', () => state.pos.length);
   liveId('pos', posTable);
   if (tabAi) {
@@ -332,6 +338,27 @@ function drawFutures(sym, q, inverse, tabAi) {
     E.openPos(state, { sym, side, margin: d.margin, lev: d.lev, price: px(sym), settle, inverse, tp: d.tp, sl: d.sl });
     toast('포지션을 열었습니다');
   });
+}
+const moneyDigits = a => STABLE[a] ? 2 : 6;
+const signedMoney = (n, a) => `<span class="${n >= 0 ? 'up' : 'down'}">${n >= 0 ? '+' : ''}${fmt(n, moneyDigits(a))}</span>`;
+const calcRow = (k, v) => `<div class="calc-row"><span>${k}</span><b>${v}</b></div>`;
+function acctHtml(settle) {
+  const a = E.positionSummary(state, settle, prices()), d = moneyDigits(settle);
+  return `<div class="acct-main"><span>미실현 손익</span><b>${signedMoney(a.unreal, settle)} <small>${esc(settle)}</small></b>
+      <span class="${a.unreal >= 0 ? 'up' : 'down'}">${a.roe >= 0 ? '+' : ''}${a.roe.toFixed(2)}%</span></div>
+    <div class="acct-grid"><div><span>열린 포지션</span><b>${a.count}개</b></div><div><span>투입 마진</span><b>${fmt(a.margin, d)}</b></div><div><span>마진 잔고</span><b>${fmt(a.balance, d)}</b></div><div><span>실현 손익</span><b>${signedMoney(a.realized, settle)}</b></div></div>`;
+}
+function calcHtml(sym, settle, inverse) {
+  const f = $('fut');
+  const v = f && E.orderPreview({ margin: f.margin.value, lev: f.lev.value, price: px(sym), tp: f.tp.value, sl: f.sl.value, inverse });
+  if (!v) return '<span class="muted">증거금을 입력하면 자동으로 계산합니다.</span>';
+  const d = moneyDigits(settle), lq = x => x > 0 ? fmtP(x) : '-';
+  return calcRow('포지션 크기', `${fmt(v.notional, d)} ${esc(settle)}`)
+    + calcRow('수량', `${fmt(v.qty, 6)} ${inverse ? 'USD' : esc(sym)}`)
+    + calcRow('진입 수수료', `${fmt(v.fee, inverse ? 6 : 4)} ${esc(settle)}`)
+    + calcRow('예상 청산가', `<span class="up">롱 ${lq(v.liqLong)}</span> · <span class="down">숏 ${lq(v.liqShort)}</span>`)
+    + (v.tpPnl !== null ? calcRow(`익절 시 (${v.side === 'long' ? '롱' : '숏'})`, signedMoney(v.tpPnl, settle)) : '')
+    + (v.slPnl !== null ? calcRow(`손절 시 (${v.side === 'long' ? '롱' : '숏'})`, signedMoney(v.slPnl, settle)) : '');
 }
 const aiCloses = {};
 async function loadAiCloses(sym) {
