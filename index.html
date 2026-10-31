@@ -117,6 +117,20 @@ h3 { margin: 0 0 10px; font-size: 16px; }
 .big-btn { padding: 13px 26px; font-size: 16px; border-radius: 24px; }
 .mini { background: var(--soft); color: var(--text); padding: 5px 10px; border-radius: 7px; font-size: 12px; white-space: nowrap; display: inline-block; }
 .mini:hover { background: var(--blue-strong); }
+.pos-table th, .pos-table td { white-space: nowrap; }
+.side { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.side.long { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.side.short { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+.sw { display: block; width: 34px; height: 18px; border-radius: 9px; background: var(--sub); position: relative; transition: background .15s; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.sw.on { background: var(--up); }
+.sw.on::after { transform: translateX(16px); }
+.pos-acts { display: flex; gap: 5px; }
+.act { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 6px; color: #fff; white-space: nowrap; }
+.act:hover { filter: brightness(1.1); }
+.act-close { background: transparent; color: var(--down); border: 1px solid var(--down); }
+.act-rev { background: #e67e22; }
+.act-add { background: #1f9d55; }
 .lnk { color: #8fb4ff; }
 .big { font-size: 26px; font-weight: 700; margin: 0; }
 .big small { font-size: 12px; font-weight: 400; }

@@ -42,6 +42,7 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } c
 const market = {};
 for (const k in SYMBOLS) market[k] = { price: SYMBOLS[k][1], open: SYMBOLS[k][1] };
 state.extPx ||= {};
+for (const p of state.pos) p.auto ??= true;
 // 종목 이름은 화면 HTML에 들어가므로 주소, 차트, 저장값 어디서 오든 이 형식만 받는다
 const SYM_RE = /^[A-Z0-9]{1,20}$/;
 for (const k in state.extPx) if (SYM_RE.test(k) && !SYMBOLS[k]) {
@@ -119,7 +120,10 @@ function walkSim() {
 }
 function pulse() {
   walkSim();
+  const seen = state.hist[0];
   attempt(() => E.tick(state, prices()));
+  const note = state.hist.slice(0, state.hist.indexOf(seen) + 1 || undefined).find(h => h !== seen && h.type === '자동 마진');
+  if (note) toast(note.text);
 }
 
 const META = new Map();
@@ -287,8 +291,14 @@ function drawSpot(sym) {
 function posTable(filter) {
   const list = state.pos.filter(filter);
   if (!list.length) return '<p class="muted">열린 포지션이 없습니다.</p>';
-  return `<div class="tw"><table><thead><tr><th>종목</th><th class="r">진입가</th><th class="r">현재가</th><th class="r">강제 청산가</th><th class="r">손익</th><th></th></tr></thead><tbody>${list.map(p =>
-    `<tr><td><b>${esc(p.sym)}</b> <span class="${p.side === 'long' ? 'up' : 'down'}">${p.side === 'long' ? '롱' : '숏'} ${p.lev}배</span></td><td class="r">${fmtP(p.entry)}</td><td class="r">${fmtP(px(p.sym))}</td><td class="r">${fmtP(p.liq)}</td><td class="r">${signed(E.posPnl(p, px(p.sym)), ' ' + p.settle)}</td><td class="r"><button class="mini" data-do="closepos" data-id="${p.id}">청산</button></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="tw"><table class="pos-table"><thead><tr><th>코인</th><th>방향</th><th>레버리지</th><th class="r">포지션 크기</th><th class="r">진입가</th><th class="r">현재가</th><th class="r">청산가</th><th class="r">투입 마진</th><th>자동 마진</th><th class="r">미실현 손익</th><th>액션</th></tr></thead><tbody>${list.map(p => {
+    const pnl = E.posPnl(p, px(p.sym));
+    const long = p.side === 'long';
+    return `<tr><td><b>${esc(p.sym)}</b></td><td><span class="side ${long ? 'long' : 'short'}">${long ? '롱' : '숏'}</span></td><td>${p.lev}배</td><td class="r">${fmt(p.qty, 6)} ${p.inverse ? 'USD' : esc(p.sym)}</td><td class="r">${fmtP(p.entry)}</td><td class="r">${fmtP(px(p.sym))}</td><td class="r down">${p.liq > 0 ? fmtP(p.liq) : '-'}</td><td class="r">${fmt(p.margin, 4)} ${esc(p.settle)}</td>
+      <td><button class="sw ${p.auto ? 'on' : ''}" role="switch" aria-checked="${!!p.auto}" aria-label="${esc(p.sym)} 자동 마진" data-do="automargin" data-id="${p.id}"></button></td>
+      <td class="r">${signed(pnl, ' ' + esc(p.settle))} <span class="${pnl >= 0 ? 'up' : 'down'}">(${(pnl / p.margin * 100).toFixed(2)}%)</span></td>
+      <td class="pos-acts"><button class="act act-close" data-do="closepos" data-id="${p.id}">시장가 청산</button><button class="act act-rev" data-do="reverse" data-id="${p.id}">역방향</button><button class="act act-add" data-do="addmargin" data-id="${p.id}">마진 추가</button></td></tr>`;
+  }).join('')}</tbody></table></div>`;
 }
 function viewFutures(el, pair, inverse, tabAi) {
   const q = pair.split('_')[1] || 'USDT';
@@ -674,7 +684,20 @@ function done() {
 
 const ACTIONS = {
   cancel: d => attempt(() => E.cancelOrder(state, +d.id), '주문을 취소했습니다'),
-  closepos: d => attempt(() => { const p = state.pos.find(x => x.id === +d.id); E.closePos(state, +d.id, px(p.sym)); }, '포지션을 닫았습니다'),
+  closepos: d => attempt(() => { const p = state.pos.find(x => x.id === +d.id); E.closePos(state, +d.id, px(p.sym), '시장가 청산'); }, '시장가로 청산했습니다'),
+  automargin: d => attempt(() => toast(`자동 마진을 ${E.toggleAuto(state, +d.id) ? '켰습니다' : '껐습니다'}`)),
+  reverse: d => {
+    const p = state.pos.find(x => x.id === +d.id);
+    if (!p || !confirm(`${p.sym} 포지션을 시장가로 청산하고 같은 수량의 ${p.side === 'long' ? '숏' : '롱'} ${p.lev}배로 전환할까요?`)) return;
+    attempt(() => E.reversePos(state, p.id, px(p.sym)), '역방향으로 전환했습니다');
+  },
+  addmargin: d => {
+    const p = state.pos.find(x => x.id === +d.id);
+    if (!p) return;
+    const amt = prompt(`${p.sym}에 추가할 마진 (${p.settle})\n사용 가능 ${fmt(state.bal[p.settle] || 0, 6)} · 현재 마진 ${fmt(p.margin, 4)}`);
+    if (amt === null) return;
+    attempt(() => E.addMargin(state, p.id, amt), '마진을 추가했습니다');
+  },
   redeem: d => attempt(() => E.redeem(state, +d.id, Date.now()), '해지했습니다'),
   repay: d => attempt(() => E.repay(state, +d.id, Date.now()), '상환했습니다'),
   advance: () => attempt(() => E.advanceDays(state, 30), '모의 시간을 30일 앞당겼습니다'),

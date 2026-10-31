@@ -84,7 +84,7 @@ function matchOrders(s, prices) {
 
 function liqPrice(side, entry, lev, inverse) {
   const a = 1 / lev - MAINT;
-  if (inverse) return side === 'long' ? entry / (1 + a) : entry / (1 - a);
+  if (inverse) return side === 'long' ? entry / (1 + a) : entry / (1 - Math.min(a, 0.999));
   return side === 'long' ? entry * (1 - a) : entry * (1 + a);
 }
 function openPos(s, { sym, side, margin, lev, price, settle = 'USDT', inverse = false, tp, sl }) {
@@ -99,7 +99,7 @@ function openPos(s, { sym, side, margin, lev, price, settle = 'USDT', inverse = 
     id: s.seq++, sym, side, margin, lev, entry: price, settle, inverse,
     qty: inverse ? notional * price : notional / price,
     liq: liqPrice(side, price, lev, inverse),
-    tp: tp > 0 ? Number(tp) : null, sl: sl > 0 ? Number(sl) : null, t: Date.now(),
+    tp: tp > 0 ? Number(tp) : null, sl: sl > 0 ? Number(sl) : null, t: Date.now(), auto: true,
   };
   s.pos.push(pos);
   s.vol += inverse ? pos.qty : notional;
@@ -120,10 +120,56 @@ function closePos(s, id, price, reason = '청산') {
   log(s, '선물', `${p.sym} ${reason} @ ${price}, 손익 ${pnl.toFixed(4)} ${p.settle}`);
   return pnl;
 }
+function findPos(s, id) {
+  const p = s.pos.find(x => x.id === id);
+  if (!p) throw new Error('포지션을 찾을 수 없습니다');
+  return p;
+}
+function pushMargin(p, amt) {
+  p.margin += amt;
+  p.liq = liqPrice(p.side, p.entry, (p.inverse ? p.qty / p.entry : p.qty * p.entry) / p.margin, p.inverse);
+}
+function addMargin(s, id, amt) {
+  const p = findPos(s, id);
+  amt = num(amt, '추가 마진');
+  spend(s, p.settle, amt);
+  pushMargin(p, amt);
+  log(s, '선물', `${p.sym} 마진 ${amt} ${p.settle} 추가, 새 청산가 ${Number(p.liq.toPrecision(8))}`);
+}
+function toggleAuto(s, id) {
+  const p = findPos(s, id);
+  p.auto = !p.auto;
+  log(s, '선물', `${p.sym} 자동 마진 ${p.auto ? '켜짐' : '꺼짐'}`);
+  return p.auto;
+}
+function reversePos(s, id, price) {
+  const p = findPos(s, id);
+  price = num(price, '가격');
+  const notional = p.inverse ? p.qty / price : p.qty * price;
+  const margin = notional / p.lev;
+  const back = Math.max(0, p.margin + posPnl(p, price) - notional * FEE.futures);
+  if ((s.bal[p.settle] || 0) + back < margin + notional * FEE.futures) throw new Error(`${p.settle} 잔고가 부족해 반대 포지션을 열 수 없습니다`);
+  closePos(s, id, price, '역방향 전환');
+  return openPos(s, { sym: p.sym, side: p.side === 'long' ? 'short' : 'long', margin, lev: p.lev, price, settle: p.settle, inverse: p.inverse });
+}
+// 시뮬레이터와 같은 규칙: 청산가 2% 안으로 들어오면 현재 마진의 50%를 넣고, 잔고가 모자라면 남은 전액을 넣는다
+function guardMargin(s, p, x) {
+  if (!(p.side === 'long' ? x <= p.liq * 1.02 : x >= p.liq * 0.98)) return;
+  const amt = Math.min(p.margin * 0.5, s.bal[p.settle] || 0);
+  if (amt > 0) {
+    spend(s, p.settle, amt);
+    pushMargin(p, amt);
+    log(s, '자동 마진', `${p.sym} 청산 위험, ${amt.toFixed(4)} ${p.settle} 자동 추가`);
+  } else if (!p.noFunds) {
+    p.noFunds = true;
+    log(s, '자동 마진', `${p.sym} 청산 위험, ${p.settle} 잔고가 없어 추가하지 못했습니다`);
+  }
+}
 function checkPositions(s, prices) {
   for (const p of [...s.pos]) {
     const x = prices[p.sym];
     const long = p.side === 'long';
+    if (p.auto) guardMargin(s, p, x);
     if (long ? x <= p.liq : x >= p.liq) {
       s.pos.splice(s.pos.indexOf(p), 1);
       log(s, '선물', `${p.sym} 강제 청산 @ ${x}, 증거금 ${p.margin} ${p.settle} 소진`);
@@ -287,7 +333,7 @@ function equity(s, prices) {
 }
 
 const SimEngine = {
-  FEE, START_USDT, newState, deposit, spotMarket, placeLimit, cancelOrder, matchOrders, liqPrice, openPos, posPnl, closePos,
+  FEE, START_USDT, newState, deposit, spotMarket, placeLimit, cancelOrder, matchOrders, liqPrice, openPos, posPnl, closePos, addMargin, toggleAuto, reversePos,
   checkPositions, convert, accrued, stake, redeem, advanceDays, borrow, repay, createGrid, gridStep, createDca,
   follow, botValue, stopBot, claim, tick, equity, simNow,
 };

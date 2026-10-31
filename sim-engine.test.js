@@ -49,6 +49,7 @@ s = fresh();
 p = E.openPos(s, { sym: 'BTC', side: 'short', margin: 100, lev: 10, price: 100 });
 near(E.posPnl(p, 90), 100, '숏 수익');
 near(p.liq, 100 * (1 + 0.1 - 0.005), '숏 청산가');
+E.toggleAuto(s, p.id);
 E.checkPositions(s, { BTC: p.liq + 1 });
 assert.equal(s.pos.length, 0, '숏 강제 청산');
 near(s.bal.USDT, 10000 - 100.2, '강제 청산은 증거금 소진');
@@ -128,5 +129,85 @@ E.spotMarket(s, 'BTC', 'buy', 1, 100);
 near(E.equity(s, px), start - 0.05, '평가액은 수수료만큼 감소');
 E.placeLimit(s, 'BTC', 'buy', 1, 50);
 near(E.equity(s, px), start - 0.05, '지정가 예약은 평가액 유지');
+
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'long', margin: 100, lev: 10, price: 100 });
+assert.equal(p.auto, true, '포지션을 열면 자동 마진 켜짐');
+assert.equal(E.toggleAuto(s, p.id), false, '자동 마진 끄기');
+E.toggleAuto(s, p.id);
+let usdt = s.bal.USDT;
+E.addMargin(s, p.id, 100);
+near(s.bal.USDT, usdt - 100, '마진 추가 잔고 차감');
+near(p.margin, 200, '마진 추가 반영');
+near(p.liq, 100 * (1 - 0.2 + 0.005), '마진 추가 후 롱 청산가 하락');
+assert.throws(() => E.addMargin(s, p.id, 1e9), /잔고/);
+assert.throws(() => E.addMargin(s, p.id, -1), /0보다/);
+usdt = s.bal.USDT;
+E.closePos(s, p.id, 100);
+near(s.bal.USDT, usdt + 200 - 0.2, '추가한 마진도 청산 때 돌려받음');
+
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'short', margin: 100, lev: 10, price: 100 });
+E.addMargin(s, p.id, 100);
+near(p.liq, 100 * (1 + 0.2 - 0.005), '마진 추가 후 숏 청산가 상승');
+
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'long', margin: 100, lev: 10, price: 100 });
+E.checkPositions(s, { BTC: 93 });
+near(p.margin, 100, '청산가 2% 밖이면 자동 마진 없음');
+usdt = s.bal.USDT;
+const oldLiq = p.liq;
+E.checkPositions(s, { BTC: oldLiq * 1.01 });
+near(p.margin, 150, '청산가 2% 안이면 현재 마진 50% 추가');
+near(s.bal.USDT, usdt - 50, '자동 마진 잔고 차감');
+assert.ok(p.liq < oldLiq, '자동 마진 후 청산가 하락');
+assert.equal(s.pos.length, 1, '자동 마진으로 청산 회피');
+
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'short', margin: 100, lev: 10, price: 100 });
+const off = p.liq;
+E.toggleAuto(s, p.id);
+E.checkPositions(s, { BTC: off * 0.99 });
+near(p.margin, 100, '자동 마진을 끄면 추가 없음');
+E.checkPositions(s, { BTC: off + 1 });
+assert.equal(s.pos.length, 0, '자동 마진을 끄면 강제 청산');
+
+s = fresh();
+s.bal.USDT = 130;
+p = E.openPos(s, { sym: 'BTC', side: 'long', margin: 100, lev: 10, price: 100 });
+const rest = s.bal.USDT;
+E.checkPositions(s, { BTC: p.liq * 1.01 });
+near(p.margin, 100 + rest, '잔고가 모자라면 남은 전액 투입');
+near(s.bal.USDT, 0, '잔고 전액 소진');
+const logs = s.hist.length;
+s.pos[0].liq = 90;
+E.checkPositions(s, { BTC: 90.5 });
+E.checkPositions(s, { BTC: 90.5 });
+assert.equal(s.hist.length, logs + 1, '잔고 없음 경고는 한 번만');
+
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'long', margin: 100, lev: 10, price: 100, tp: 200, sl: 50 });
+const r = E.reversePos(s, p.id, 110);
+assert.equal(s.pos.length, 1, '역방향은 한 포지션만 남김');
+assert.equal(r.side, 'short', '역방향 전환');
+near(r.qty, p.qty, '역방향은 같은 수량');
+assert.equal(r.lev, 10, '역방향은 같은 레버리지');
+near(r.entry, 110, '역방향 진입가는 현재가');
+near(r.margin, 110, '역방향 마진은 현재가 기준');
+assert.equal(r.auto, true, '역방향 포지션도 자동 마진 켜짐');
+assert.equal(r.tp, null, '역방향은 이전 익절가를 물려받지 않음');
+near(s.bal.USDT, 10000 - 100.2 + 100 + 100 - 0.22 - 110 - 0.22, '역방향 정산 후 잔고');
+
+s = fresh();
+s.bal.USDT = 100.2;
+p = E.openPos(s, { sym: 'BTC', side: 'long', margin: 100, lev: 10, price: 100 });
+assert.throws(() => E.reversePos(s, p.id, 50), /잔고가 부족/);
+assert.equal(s.pos[0].id, p.id, '역방향 실패 시 기존 포지션 유지');
+
+s = fresh();
+p = E.openPos(s, { sym: 'BTC', side: 'short', margin: 0.01, lev: 2, price: 100, settle: 'BTC', inverse: true });
+E.addMargin(s, p.id, 0.03);
+assert.ok(Number.isFinite(p.liq) && p.liq > 100, '코인 마진 숏은 마진을 늘려도 청산가가 유한');
+assert.equal(JSON.parse(JSON.stringify(p)).liq, p.liq, '저장해도 청산가 유지');
 
 console.log('sim-engine: 모든 검사 통과');
