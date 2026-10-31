@@ -319,7 +319,9 @@ function drawFutures(sym, q, inverse, tabAi) {
     <form class="panel form" id="fut">
       <h3 class="order-title">모의 주문</h3>
       <label>증거금 (${esc(settle)})<input name="margin" inputmode="decimal" required></label>
-      <label>레버리지 <output id="levv">10배</output><input type="range" name="lev" min="1" max="200" value="10"></label>
+      <div class="lev-field"><span class="lev-label">레버리지 (1~200배)</span>
+        <div class="lev-row"><button type="button" class="lev-btn" id="lev-minus" aria-label="레버리지 1배 낮추기">−</button><input id="lev-num" type="number" min="1" max="200" step="1" inputmode="numeric" value="10" aria-label="레버리지 배수"><span class="lev-unit">배</span><button type="button" class="lev-btn" id="lev-plus" aria-label="레버리지 1배 높이기">+</button></div>
+        <input type="range" name="lev" min="1" max="200" step="1" value="10" aria-label="레버리지 슬라이더"></div>
       <div class="two"><label>익절가<input name="tp" inputmode="decimal" placeholder="선택"></label><label>손절가<input name="sl" inputmode="decimal" placeholder="선택"></label></div>
       <p class="muted" id="fut-bal"></p>
       <div class="calc" id="fut-calc"></div>
@@ -327,7 +329,18 @@ function drawFutures(sym, q, inverse, tabAi) {
     </form>${tabAi ? '<div class="panel" id="ai"></div>' : ''}<div class="panel" id="book"></div>`;
   $('trade-bottom').innerHTML = '<div class="panel"><h3>포지션 <span class="muted" id="pos-n"></span></h3><div id="pos"></div></div>';
   tradeTop(sym, inverse ? `${sym}/USD 코인 마진` : `${sym}/${q} 무기한`, `${nameOf(sym)} · 모의 선물`);
-  $('fut').lev.addEventListener('input', e => { $('levv').textContent = e.target.value + '배'; });
+  const levForm = $('fut'), levNum = $('lev-num');
+  const setLev = v => {
+    v = Math.min(200, Math.max(1, Math.round(Number(v)) || 1));
+    levForm.lev.value = levNum.value = v;
+    levForm.dispatchEvent(new Event('input'));
+  };
+  levForm.lev.addEventListener('input', e => { levNum.value = e.target.value; });
+  // 입력 중에는 범위 안의 값만 반영하고, 비거나 벗어난 값은 칸을 떠날 때 바로잡는다
+  levNum.addEventListener('input', () => { const v = Number(levNum.value); if (Number.isInteger(v) && v >= 1 && v <= 200) levForm.lev.value = v; });
+  levNum.addEventListener('change', () => setLev(levNum.value));
+  $('lev-minus').addEventListener('click', () => setLev(Number(levForm.lev.value) - 1));
+  $('lev-plus').addEventListener('click', () => setLev(Number(levForm.lev.value) + 1));
   liveId('book', () => bookHtml(sym));
   liveId('fut-bal', () => balLine(settle));
   liveId('acct', () => acctHtml(settle));
