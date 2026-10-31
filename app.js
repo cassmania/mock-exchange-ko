@@ -42,7 +42,9 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } c
 const market = {};
 for (const k in SYMBOLS) market[k] = { price: SYMBOLS[k][1], open: SYMBOLS[k][1] };
 state.extPx ||= {};
-for (const k in state.extPx) if (!SYMBOLS[k]) {
+// 종목 이름은 화면 HTML에 들어가므로 주소, 차트, 저장값 어디서 오든 이 형식만 받는다
+const SYM_RE = /^[A-Z0-9]{1,20}$/;
+for (const k in state.extPx) if (SYM_RE.test(k) && !SYMBOLS[k]) {
   SYMBOLS[k] = [k, state.extPx[k], 'chart'];
   market[k] = { price: state.extPx[k], open: state.extPx[k] };
 }
@@ -213,7 +215,7 @@ window.MOCK_CHART = {
   },
   select(s) {
     const b = baseOf(s);
-    if (!b || !tradeCtx || b === tradeCtx.sym) return;
+    if (!SYM_RE.test(b) || !tradeCtx || b === tradeCtx.sym) return;
     ensureSymbol(b);
     tradeCtx.sym = b;
     history.replaceState(null, '', link(tradeCtx.pathFor(b)));
@@ -234,6 +236,7 @@ function setTradeTheme() {
 }
 function openTrade(el, sym, draw, pathFor) {
   sym = sym.toUpperCase();
+  if (!SYM_RE.test(sym)) return viewInfo(el, location.hash.slice(1).split('?')[0]);
   ensureSymbol(sym);
   el.classList.add('wide');
   setTradeTheme();
