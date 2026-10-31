@@ -210,4 +210,11 @@ E.addMargin(s, p.id, 0.03);
 assert.ok(Number.isFinite(p.liq) && p.liq > 100, '코인 마진 숏은 마진을 늘려도 청산가가 유한');
 assert.equal(JSON.parse(JSON.stringify(p)).liq, p.liq, '저장해도 청산가 유지');
 
+s = fresh();
+for (let i = 0; i < 300; i++) E.openPos(s, { sym: i % 2 ? 'BTC' : 'ETH', side: i % 3 ? 'long' : 'short', margin: 1, lev: 2, price: 100 });
+assert.equal(s.pos.length, 300, '포지션 개수 제한 없음');
+E.checkPositions(s, { BTC: 100, ETH: 100 });
+assert.equal(s.pos.length, 300, '다른 코인과 같은 코인 포지션이 공존');
+assert.equal(new Set(s.pos.map(x => x.id)).size, 300, '포지션마다 별도 번호');
+
 console.log('sim-engine: 모든 검사 통과');

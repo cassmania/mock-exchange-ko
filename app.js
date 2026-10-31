@@ -278,7 +278,7 @@ function drawSpot(sym) {
   liveId('book', () => bookHtml(sym));
   liveId('spot-bal', () => `${balLine('USDT')}<br>${balLine(sym)}`);
   liveId('orders', () => {
-    const list = state.orders.filter(o => o.sym === sym);
+    const list = state.orders;
     return list.length ? `<div class="tw"><table><tbody>${list.map(o => `<tr><td>${o.side === 'buy' ? '매수' : '매도'}</td><td>${fmt(o.qty, 6)} ${esc(o.sym)}</td><td class="r">지정가 ${fmtP(o.limit)}</td><td class="r"><button class="mini" data-do="cancel" data-id="${o.id}">취소</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">없음</p>';
   });
   onForm('spot', (d, side) => {
@@ -288,8 +288,8 @@ function drawSpot(sym) {
 }
 
 /* ---------- 선물 ---------- */
-function posTable(filter) {
-  const list = state.pos.filter(filter);
+function posTable() {
+  const list = state.pos;
   if (!list.length) return '<p class="muted">열린 포지션이 없습니다.</p>';
   return `<div class="tw"><table class="pos-table"><thead><tr><th>코인</th><th>방향</th><th>레버리지</th><th class="r">포지션 크기</th><th class="r">진입가</th><th class="r">현재가</th><th class="r">청산가</th><th class="r">투입 마진</th><th>자동 마진</th><th class="r">미실현 손익</th><th>액션</th></tr></thead><tbody>${list.map(p => {
     const pnl = E.posPnl(p, px(p.sym));
@@ -315,12 +315,13 @@ function drawFutures(sym, q, inverse, tabAi) {
       <p class="muted" id="fut-bal"></p>
       <div class="two"><button class="btn up-bg" value="long">롱</button><button class="btn down-bg" value="short">숏</button></div>
     </form>${tabAi ? '<div class="panel" id="ai"></div>' : ''}<div class="panel" id="book"></div>`;
-  $('trade-bottom').innerHTML = '<div class="panel"><h3>포지션</h3><div id="pos"></div></div>';
+  $('trade-bottom').innerHTML = '<div class="panel"><h3>포지션 <span class="muted" id="pos-n"></span></h3><div id="pos"></div></div>';
   tradeTop(sym, inverse ? `${sym}/USD 코인 마진` : `${sym}/${q} 무기한`, `${nameOf(sym)} · 모의 선물`);
   $('fut').lev.addEventListener('input', e => { $('levv').textContent = e.target.value + '배'; });
   liveId('book', () => bookHtml(sym));
   liveId('fut-bal', () => balLine(settle));
-  liveId('pos', () => posTable(p => p.sym === sym));
+  liveId('pos-n', () => state.pos.length);
+  liveId('pos', posTable);
   if (tabAi) {
     loadAiCloses(sym).then(refresh);
     liveId('ai', () => aiText(sym));
@@ -513,7 +514,7 @@ function viewAssets(el) {
     <div class="panel"><h3>거래 내역</h3><div id="hist"></div></div>`;
   liveId('eq', () => fmt(E.equity(state, prices()), 2));
   liveId('bals', () => `<div class="tw"><table><tbody>${Object.entries(state.bal).filter(([, v]) => v > 1e-12).map(([a, v]) => `<tr><td><b>${a}</b></td><td class="r">${fmt(v, 8)}</td><td class="r muted">≈ ${fmt(v * (px(a) || 0), 2)} USDT</td></tr>`).join('')}</tbody></table></div>`);
-  liveId('pos', () => posTable(() => true));
+  liveId('pos', posTable);
   liveId('hist', () => state.hist.length ? `<div class="tw"><table><tbody>${state.hist.slice(0, 40).map(h => `<tr><td class="muted">${new Date(h.t).toLocaleTimeString('ko-KR')}</td><td>${esc(h.type)}</td><td>${esc(h.text)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">내역이 없습니다.</p>');
   onForm('fa', d => E.deposit(state, d.asset, d.amt), '가상 자금을 충전했습니다');
 }
