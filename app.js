@@ -41,6 +41,11 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } c
 
 const market = {};
 for (const k in SYMBOLS) market[k] = { price: SYMBOLS[k][1], open: SYMBOLS[k][1] };
+state.extPx ||= {};
+for (const k in state.extPx) if (!SYMBOLS[k]) {
+  SYMBOLS[k] = [k, state.extPx[k], 'chart'];
+  market[k] = { price: state.extPx[k], open: state.extPx[k] };
+}
 let feed = 'sim';
 const prices = () => { const p = { ...STABLE }; for (const k in market) p[k] = market[k].price; return p; };
 const px = s => market[s]?.price ?? STABLE[s];
@@ -49,7 +54,7 @@ const chg = s => (market[s].price / market[s].open - 1) * 100;
 const fmtP = n => n == null || !Number.isFinite(n) ? '-' : n.toLocaleString('en-US', { maximumFractionDigits: n >= 1000 ? 2 : n >= 1 ? 4 : 8 });
 const fmt = (n, d = 4) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: d });
 const signed = (n, suf = '') => `<span class="${n >= 0 ? 'up' : 'down'}">${n >= 0 ? '+' : ''}${fmt(n, 4)}${suf}</span>`;
-const pct = s => `<span class="${chg(s) >= 0 ? 'up' : 'down'}">${chg(s) >= 0 ? '+' : ''}${chg(s).toFixed(2)}%</span>`;
+const pct = s => Number.isFinite(chg(s)) ? `<span class="${chg(s) >= 0 ? 'up' : 'down'}">${chg(s) >= 0 ? '+' : ''}${chg(s).toFixed(2)}%</span>` : '';
 const nameOf = s => SYMBOLS[s]?.[0] || s;
 
 function toast(msg, bad) {
@@ -82,15 +87,31 @@ async function pollLive() {
     if (!r.ok) throw new Error(r.status);
     for (const x of await r.json()) {
       const k = x.symbol.replace('USDT', '');
+      if (Date.now() - (market[k].ext || 0) < 15000) continue;
       market[k].price = Number(x.lastPrice);
       market[k].open = Number(x.openPrice);
     }
     feed = 'live';
   } catch { feed = 'sim'; }
 }
+// 차트 앱이 꺼진 동안에도 차트에서 고른 종목의 가격을 이어 받는다
+async function pollChartSymbols() {
+  const keys = Object.keys(SYMBOLS).filter(k => SYMBOLS[k][2] === 'chart');
+  if (!keys.length) return;
+  try {
+    const d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear')).json();
+    const map = new Map(d.result.list.map(t => [t.symbol, t]));
+    for (const k of keys) {
+      const t = map.get(k + 'USDT');
+      if (!t || Date.now() - (market[k].ext || 0) < 15000) continue;
+      window.MOCK_CHART.tick(k + 'USDT', Number(t.lastPrice), Number(t.price24hPcnt) * 100);
+      market[k].ext = 0;
+    }
+  } catch { /* 다음 주기에 다시 받는다 */ }
+}
 function walkSim() {
   for (const k in market) {
-    if (SYMBOLS[k][3] && feed === 'live') continue;
+    if (SYMBOLS[k][2] === 'chart' || (SYMBOLS[k][3] && feed === 'live')) continue;
     market[k].price *= 1 + (Math.random() - 0.5) * 0.002;
   }
 }
@@ -134,95 +155,124 @@ function marketTable(list, base = '/exchange') {
 }
 const byCat = c => Object.keys(SYMBOLS).filter(k => SYMBOLS[k][2] === c);
 
-/* ---------- 차트 ---------- */
-const candles = {};
-async function loadCandles(sym) {
-  if (candles[sym]) return;
-  candles[sym] = [];
-  if (SYMBOLS[sym]?.[3]) {
-    try {
-      const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=1m&limit=90`);
-      if (r.ok) { candles[sym] = (await r.json()).map(k => ({ t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] })); return; }
-    } catch { /* 아래 합성 캔들로 대체 */ }
-  }
-  let p = px(sym);
-  const now = Math.floor(Date.now() / 60000) * 60000;
-  for (let i = 90; i > 0; i--) {
-    const c = p;
-    const o = c * (1 + (Math.random() - 0.5) * 0.004);
-    candles[sym].unshift({ t: now - i * 60000, o, c, h: Math.max(o, c) * 1.001, l: Math.min(o, c) * 0.999 });
-    p = o;
-  }
+/* ---------- 차트 연결 ---------- */
+// 차트 화면은 chart/ 의 코인차트 앱이고, 아래 MOCK_CHART로 시세와 선택 종목을 주고받는다
+const TF_SEC = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '12h': 43200, '1d': 86400, '1w': 604800, '1M': 2592000 };
+const simSeries = {};
+const baseOf = s => String(s || '').replace(/USDT$/, '');
+const isSim = b => SYMBOLS[b] && SYMBOLS[b][2] !== 'chart' && !SYMBOLS[b][3];
+function ensureSymbol(b, price = state.extPx[b]) {
+  if (SYMBOLS[b]) return;
+  SYMBOLS[b] = [b, price, 'chart'];
+  market[b] = { price, open: price };
 }
-function drawChart(canvas, sym) {
-  if (!canvas || !candles[sym]?.length) return;
-  const list = candles[sym];
-  const price = px(sym);
-  const bucket = Math.floor(Date.now() / 60000) * 60000;
-  let last = list[list.length - 1];
-  if (last.t < bucket) { last = { t: bucket, o: last.c, h: price, l: price, c: price }; list.push(last); if (list.length > 200) list.shift(); }
-  last.c = price; last.h = Math.max(last.h, price); last.l = Math.min(last.l, price);
-  const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
-  if (!w || !h) return;
-  canvas.width = w * dpr; canvas.height = h * dpr;
-  const g = canvas.getContext('2d');
-  g.scale(dpr, dpr);
-  g.clearRect(0, 0, w, h);
-  const show = list.slice(-Math.max(20, Math.floor((w - 70) / 7)));
-  const hi = Math.max(...show.map(c => c.h)), lo = Math.min(...show.map(c => c.l));
-  const y = v => 10 + (hi - v) / ((hi - lo) || 1) * (h - 24);
-  const cw = (w - 70) / show.length;
-  g.font = '11px sans-serif';
-  for (let i = 0; i <= 4; i++) {
-    const v = lo + (hi - lo) * i / 4;
-    g.strokeStyle = '#1b1d23'; g.beginPath(); g.moveTo(0, y(v)); g.lineTo(w - 66, y(v)); g.stroke();
-    g.fillStyle = '#7f8590'; g.fillText(fmtP(v), w - 62, y(v) + 4);
+function simRows(b, tf) {
+  const key = `${b}|${tf}`;
+  if (simSeries[key]) return simSeries[key];
+  const step = TF_SEC[tf] || 3600;
+  const swing = 0.0016 * Math.sqrt(step / 60);
+  const now = Math.floor(Date.now() / 1000 / step) * step;
+  const rows = [];
+  let close = px(b);
+  for (let i = 0; i < 500; i++) {
+    const open = close * (1 + (Math.random() - 0.5) * swing);
+    const wick = 1 + Math.random() * swing / 2;
+    rows.unshift({ time: now - i * step, open, close, high: Math.max(open, close) * wick, low: Math.min(open, close) / wick, volume: 1000 + Math.random() * 9000 });
+    close = open;
   }
-  show.forEach((c, i) => {
-    const x = i * cw + cw / 2;
-    g.strokeStyle = g.fillStyle = c.c >= c.o ? '#2ebd85' : '#f6465d';
-    g.beginPath(); g.moveTo(x, y(c.h)); g.lineTo(x, y(c.l)); g.stroke();
-    g.fillRect(x - cw * 0.35, Math.min(y(c.o), y(c.c)), cw * 0.7, Math.max(1, Math.abs(y(c.o) - y(c.c))));
-  });
-  g.strokeStyle = '#3378ff'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, y(price)); g.lineTo(w - 66, y(price)); g.stroke(); g.setLineDash([]);
+  return (simSeries[key] = rows);
 }
-function chartBlock(sym) {
-  loadCandles(sym).then(refresh);
-  addLive(() => drawChart($('chart'), sym));
-  return '<div class="panel chart-wrap"><canvas id="chart" aria-label="가격 차트"></canvas></div>';
+window.MOCK_CHART = {
+  candles(s, tf) {
+    const b = baseOf(s);
+    return isSim(b) ? simRows(b, tf).map(c => ({ ...c })) : null;
+  },
+  live(s, tf) {
+    const b = baseOf(s);
+    if (!isSim(b)) return null;
+    const rows = simRows(b, tf), step = TF_SEC[tf] || 3600, p = px(b);
+    const t = Math.floor(Date.now() / 1000 / step) * step;
+    let last = rows[rows.length - 1];
+    if (last.time < t) { last = { time: t, open: last.close, high: p, low: p, close: p, volume: 0 }; rows.push(last); }
+    last.close = p; last.high = Math.max(last.high, p); last.low = Math.min(last.low, p);
+    return { ...last };
+  },
+  tickers() {
+    const map = new Map();
+    for (const k in SYMBOLS) if (isSim(k)) map.set(k + 'USDT', { price: px(k), chg: chg(k) });
+    return map;
+  },
+  tick(s, price, change) {
+    const b = baseOf(s);
+    if (!SYMBOLS[b] || isSim(b)) return;
+    const m = market[b];
+    m.price = price;
+    m.ext = Date.now();
+    if (Number.isFinite(change)) m.open = price / (1 + change / 100);
+    if (SYMBOLS[b][2] === 'chart') state.extPx[b] = price;
+  },
+  select(s) {
+    const b = baseOf(s);
+    if (!b || !tradeCtx || b === tradeCtx.sym) return;
+    ensureSymbol(b);
+    tradeCtx.sym = b;
+    history.replaceState(null, '', link(tradeCtx.pathFor(b)));
+    live = [];
+    tradeCtx.draw(b);
+    refresh();
+  },
+  theme(light) {
+    chartLight = light;
+    if (tradeCtx) setTradeTheme();
+  },
+};
+let tradeCtx = null;
+let chartLight = (() => { try { return (localStorage.getItem('theme') || 'light') === 'light'; } catch { return true; } })();
+function setTradeTheme() {
+  $('view').classList.toggle('cream', chartLight);
+  $('view').classList.toggle('charcoal', !chartLight);
+}
+function openTrade(el, sym, draw, pathFor) {
+  sym = sym.toUpperCase();
+  ensureSymbol(sym);
+  el.classList.add('wide');
+  setTradeTheme();
+  el.innerHTML = `<div class="trade"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT"></iframe></div><aside class="trade-side" id="trade-side"></aside></div><div class="trade-bottom" id="trade-bottom"></div>`;
+  tradeCtx = { sym, draw, pathFor };
+  draw(sym);
 }
 function bookHtml(sym) {
   const p = px(sym);
+  if (!(p > 0)) return '<p class="muted">시세를 받는 중입니다.</p>';
   const row = (x, side, i) => `<div class="book-row ${side}"><span>${fmtP(x)}</span><span>${fmt(((Math.sin(x * 97 + i) + 1.2) * 3), 3)}</span></div>`;
   const asks = Array.from({ length: 8 }, (_, i) => row(p * (1 + 0.0004 * (8 - i)), 'down', i)).join('');
   const bids = Array.from({ length: 8 }, (_, i) => row(p * (1 - 0.0004 * (i + 1)), 'up', i)).join('');
-  return `<div class="book-head"><span>가격</span><span>수량</span></div>${asks}<div class="book-mid">${fmtP(p)}</div>${bids}`;
+  return `<div class="book-head"><span>모의 호가</span><span>수량</span></div>${asks}<div class="book-mid">${fmtP(p)}</div>${bids}`;
 }
 function tradeTop(sym, label, sub) {
-  liveId('t-top', () => `<b class="t-sym">${esc(label)}</b><span class="t-price">${fmtP(px(sym))}</span>${SYMBOLS[sym] ? pct(sym) : ''}<span class="muted">${esc(sub)}</span>`);
-  return '<div class="t-top" id="t-top"></div>';
+  liveId('t-top', () => `<b class="t-sym">${esc(label)}</b><span class="t-price">${fmtP(px(sym))}</span>${pct(sym)}<span class="muted">${esc(sub)}</span>`);
 }
 
 /* ---------- 현물 ---------- */
 function viewSpot(el, pair) {
-  const sym = pair.split('_')[0];
-  if (!SYMBOLS[sym]) return viewInfo(el, '/exchange/' + pair);
-  el.innerHTML = `${tradeTop(sym, `${sym}/USDT`, `${nameOf(sym)} · 모의 현물`)}
-    <div class="t-grid">${chartBlock(sym)}
-      <div class="panel" id="book"></div>
-      <form class="panel form" id="spot">
-        <div class="seg"><label><input type="radio" name="type" value="market" checked>시장가</label><label><input type="radio" name="type" value="limit">지정가</label></div>
-        <label>지정가 (USDT)<input name="limit" inputmode="decimal" placeholder="지정가 주문에만 사용"></label>
-        <label>수량 (${sym})<input name="qty" inputmode="decimal" required></label>
-        <p class="muted" id="spot-bal"></p>
-        <div class="two"><button class="btn up-bg" value="buy">매수</button><button class="btn down-bg" value="sell">매도</button></div>
-      </form></div>
-    <div class="panel"><h3>미체결 주문</h3><div id="orders"></div></div>`;
+  openTrade(el, pair.split('_')[0], drawSpot, s => `/exchange/${s}_USDT`);
+}
+function drawSpot(sym) {
+  $('trade-side').innerHTML = `<div id="t-top" class="t-top"></div>
+    <form class="panel form" id="spot">
+      <div class="seg"><label><input type="radio" name="type" value="market" checked>시장가</label><label><input type="radio" name="type" value="limit">지정가</label></div>
+      <label>지정가 (USDT)<input name="limit" inputmode="decimal" placeholder="지정가 주문에만 사용"></label>
+      <label>수량 (${esc(sym)})<input name="qty" inputmode="decimal" required></label>
+      <p class="muted" id="spot-bal"></p>
+      <div class="two"><button class="btn up-bg" value="buy">매수</button><button class="btn down-bg" value="sell">매도</button></div>
+    </form><div class="panel" id="book"></div>`;
+  $('trade-bottom').innerHTML = '<div class="panel"><h3>미체결 주문</h3><div id="orders"></div></div>';
+  tradeTop(sym, `${sym}/USDT`, `${nameOf(sym)} · 모의 현물`);
   liveId('book', () => bookHtml(sym));
   liveId('spot-bal', () => `${balLine('USDT')}<br>${balLine(sym)}`);
   liveId('orders', () => {
     const list = state.orders.filter(o => o.sym === sym);
-    return list.length ? `<div class="tw"><table><tbody>${list.map(o => `<tr><td>${o.side === 'buy' ? '매수' : '매도'}</td><td>${fmt(o.qty, 6)} ${o.sym}</td><td class="r">지정가 ${fmtP(o.limit)}</td><td class="r"><button class="mini" data-do="cancel" data-id="${o.id}">취소</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">없음</p>';
+    return list.length ? `<div class="tw"><table><tbody>${list.map(o => `<tr><td>${o.side === 'buy' ? '매수' : '매도'}</td><td>${fmt(o.qty, 6)} ${esc(o.sym)}</td><td class="r">지정가 ${fmtP(o.limit)}</td><td class="r"><button class="mini" data-do="cancel" data-id="${o.id}">취소</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">없음</p>';
   });
   onForm('spot', (d, side) => {
     if (d.type === 'limit') { E.placeLimit(state, sym, side, d.qty, d.limit); toast('지정가 주문을 접수했습니다'); }
@@ -235,39 +285,54 @@ function posTable(filter) {
   const list = state.pos.filter(filter);
   if (!list.length) return '<p class="muted">열린 포지션이 없습니다.</p>';
   return `<div class="tw"><table><thead><tr><th>종목</th><th class="r">진입가</th><th class="r">현재가</th><th class="r">강제 청산가</th><th class="r">손익</th><th></th></tr></thead><tbody>${list.map(p =>
-    `<tr><td><b>${p.sym}</b> <span class="${p.side === 'long' ? 'up' : 'down'}">${p.side === 'long' ? '롱' : '숏'} ${p.lev}배</span></td><td class="r">${fmtP(p.entry)}</td><td class="r">${fmtP(px(p.sym))}</td><td class="r">${fmtP(p.liq)}</td><td class="r">${signed(E.posPnl(p, px(p.sym)), ' ' + p.settle)}</td><td class="r"><button class="mini" data-do="closepos" data-id="${p.id}">청산</button></td></tr>`).join('')}</tbody></table></div>`;
+    `<tr><td><b>${esc(p.sym)}</b> <span class="${p.side === 'long' ? 'up' : 'down'}">${p.side === 'long' ? '롱' : '숏'} ${p.lev}배</span></td><td class="r">${fmtP(p.entry)}</td><td class="r">${fmtP(px(p.sym))}</td><td class="r">${fmtP(p.liq)}</td><td class="r">${signed(E.posPnl(p, px(p.sym)), ' ' + p.settle)}</td><td class="r"><button class="mini" data-do="closepos" data-id="${p.id}">청산</button></td></tr>`).join('')}</tbody></table></div>`;
 }
 function viewFutures(el, pair, inverse, tabAi) {
-  const [sym, q] = pair.split('_');
-  if (!SYMBOLS[sym]) return viewInfo(el, '/futures/' + pair);
+  const q = pair.split('_')[1] || 'USDT';
+  const pathFor = s => inverse ? `/futures/coin-m/${s}_USD` : `/futures/${s}_${q}`;
+  openTrade(el, pair.split('_')[0], sym => drawFutures(sym, q, inverse, tabAi), pathFor);
+}
+function drawFutures(sym, q, inverse, tabAi) {
   const settle = inverse ? sym : q;
-  el.innerHTML = `${tradeTop(sym, inverse ? `${sym}/USD 코인 마진` : `${sym}/${q} 무기한`, `${nameOf(sym)} · 모의 선물`)}
-    ${tabAi ? '<div class="panel" id="ai"></div>' : ''}
-    <div class="t-grid">${chartBlock(sym)}
-      <div class="panel" id="book"></div>
-      <form class="panel form" id="fut">
-        <label>증거금 (${settle})<input name="margin" inputmode="decimal" required></label>
-        <label>레버리지 <output id="levv">10배</output><input type="range" name="lev" min="1" max="200" value="10"></label>
-        <div class="two"><label>익절가<input name="tp" inputmode="decimal" placeholder="선택"></label><label>손절가<input name="sl" inputmode="decimal" placeholder="선택"></label></div>
-        <p class="muted" id="fut-bal"></p>
-        <div class="two"><button class="btn up-bg" value="long">롱</button><button class="btn down-bg" value="short">숏</button></div>
-      </form></div>
-    <div class="panel"><h3>포지션</h3><div id="pos"></div></div>`;
+  $('trade-side').innerHTML = `<div id="t-top" class="t-top"></div>
+    <form class="panel form" id="fut">
+      <label>증거금 (${esc(settle)})<input name="margin" inputmode="decimal" required></label>
+      <label>레버리지 <output id="levv">10배</output><input type="range" name="lev" min="1" max="200" value="10"></label>
+      <div class="two"><label>익절가<input name="tp" inputmode="decimal" placeholder="선택"></label><label>손절가<input name="sl" inputmode="decimal" placeholder="선택"></label></div>
+      <p class="muted" id="fut-bal"></p>
+      <div class="two"><button class="btn up-bg" value="long">롱</button><button class="btn down-bg" value="short">숏</button></div>
+    </form>${tabAi ? '<div class="panel" id="ai"></div>' : ''}<div class="panel" id="book"></div>`;
+  $('trade-bottom').innerHTML = '<div class="panel"><h3>포지션</h3><div id="pos"></div></div>';
+  tradeTop(sym, inverse ? `${sym}/USD 코인 마진` : `${sym}/${q} 무기한`, `${nameOf(sym)} · 모의 선물`);
   $('fut').lev.addEventListener('input', e => { $('levv').textContent = e.target.value + '배'; });
   liveId('book', () => bookHtml(sym));
   liveId('fut-bal', () => balLine(settle));
   liveId('pos', () => posTable(p => p.sym === sym));
-  if (tabAi) liveId('ai', () => {
-    const c = candles[sym] || [];
-    if (c.length < 21) return '<p class="muted">데이터 수집 중</p>';
-    const mean = n => c.slice(-n).reduce((a, x) => a + x.c, 0) / n;
-    const up = mean(5) >= mean(20);
-    return `<h3>AI 전략 (모의)</h3><p>5분 평균이 20분 평균보다 ${up ? '높아 <b class="up">상승 추세</b>' : '낮아 <b class="down">하락 추세</b>'}로 봅니다. 단순 이동평균 규칙으로 만든 연습용 문구이며 투자 조언이 아닙니다.</p>`;
-  });
+  if (tabAi) {
+    loadAiCloses(sym).then(refresh);
+    liveId('ai', () => aiText(sym));
+  }
   onForm('fut', (d, side) => {
     E.openPos(state, { sym, side, margin: d.margin, lev: d.lev, price: px(sym), settle, inverse, tp: d.tp, sl: d.sl });
     toast('포지션을 열었습니다');
   });
+}
+const aiCloses = {};
+async function loadAiCloses(sym) {
+  if (aiCloses[sym]) return;
+  aiCloses[sym] = [];
+  if (isSim(sym)) { aiCloses[sym] = simRows(sym, '1m').slice(-30).map(c => c.close); return; }
+  try {
+    const r = await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${encodeURIComponent(sym)}USDT&interval=1&limit=30`);
+    aiCloses[sym] = (await r.json()).result.list.map(k => +k[4]).reverse();
+  } catch { /* 문구 대신 데이터 부족 안내를 보여 준다 */ }
+}
+function aiText(sym) {
+  const c = aiCloses[sym] || [];
+  if (c.length < 21) return '<h3>AI 전략 (모의)</h3><p class="muted">1분봉 데이터가 부족합니다.</p>';
+  const mean = n => c.slice(-n).reduce((a, x) => a + x, 0) / n;
+  const up = mean(5) >= mean(20);
+  return `<h3>AI 전략 (모의)</h3><p>5분 평균이 20분 평균보다 ${up ? '높아 <b class="up">상승 추세</b>' : '낮아 <b class="down">하락 추세</b>'}로 봅니다. 단순 이동평균 규칙으로 만든 연습용 문구이며 투자 조언이 아닙니다.</p>`;
 }
 
 /* ---------- 시장·목록 ---------- */
@@ -451,8 +516,11 @@ function viewPrice(el, path, sym, quote) {
     return;
   }
   if (!sym) return viewList(el, path, Object.keys(SYMBOLS));
-  if (!SYMBOLS[sym]) return viewInfo(el, path);
-  el.innerHTML = `${tradeTop(sym, nameOf(sym), `${sym} 시세`)}${chartBlock(sym)}<div class="action-row"><a class="btn" href="${link(`/exchange/${sym}_USDT`)}">현물 거래</a><a class="btn ghost" href="${link(`/futures/${sym}_USDT`)}">선물 거래</a></div>`;
+  openTrade(el, sym, s => {
+    $('trade-side').innerHTML = `<div id="t-top" class="t-top"></div><div class="action-row"><a class="btn" href="${link(`/exchange/${s}_USDT`)}">현물 거래</a><a class="btn ghost" href="${link(`/futures/${s}_USDT`)}">선물 거래</a></div>`;
+    $('trade-bottom').innerHTML = '';
+    tradeTop(s, nameOf(s), `${s} 시세`);
+  }, s => `/price/${s}`);
 }
 function viewHowTo(el, path, sym) {
   const s = SYMBOLS[sym] ? sym : 'BTC';
@@ -506,7 +574,7 @@ function viewMap(el) {
   const tag = t => ({ hot: '<span class="tag hot">🔥 인기</span>', new: '<span class="tag">NEW</span>', badge: '<span class="tag badge">강조</span>' }[t] || '');
   el.innerHTML = `<h1 class="page-title">전체 메뉴 구성</h1>
     <p class="lead">2026년 10월 31일 MEXC 영어판의 메뉴 구조를 참고해 직접 번역하고 이름을 바꾼 연습용 구성입니다. MEXC와 관련이 없습니다.</p>
-    <div class="stats">${[[HEADER_MENUS.length, '상단 메뉴'], [headerCount, '상단 하위 항목'], [FOOTER.length, '푸터 묶음'], [footItems.length, '푸터 항목']].map(s => `<div class="stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join('')}</div>
+    <div class="stats">${[[HEADER_MENUS.length, '상단 메뉴'], [headerCount, '상단 하위 항목'], [FOOTER.length, '원본 푸터 묶음'], [footItems.length, '원본 푸터 항목']].map(s => `<div class="stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join('')}</div>
     <section id="header-menus"><h2>상단 메뉴<small>Header</small></h2><p class="sec-desc">8개 메뉴 중 시장과 리워드 허브는 하위 메뉴 없이 바로 이동합니다.</p>
     ${HEADER_MENUS.map(m => `<article class="menu-block" data-menu><h3>${esc(m.ko)}<small>${esc(m.en)}</small></h3><p>${esc(m.desc)}</p>
       ${m.path && !m.groups.length ? `<a class="lnk" href="${link(m.path)}">${esc(m.ko)} 열기</a>` : ''}
@@ -581,6 +649,8 @@ function render() {
   const [path, qs] = raw.split('?');
   const q = new URLSearchParams(qs || '');
   const el = $('view');
+  el.className = '';
+  tradeCtx = null;
   live = [];
   for (const [re, fn] of ROUTES) {
     const m = path.match(re);
@@ -634,9 +704,6 @@ $('nav').innerHTML = HEADER_MENUS.map(m => {
     </div>`).join('')}</div>` : '';
   return `<div class="nav-item">${top}${drop}</div>`;
 }).join('');
-const footLink = i => `<a href="${link(i[2])}">${esc(i[0])}</a>`;
-$('foot').innerHTML = FOOTER.map(c => `<div><h4>${esc(c.ko)}<small>${esc(c.en)}</small></h4>
-  ${c.items.map(i => i.sub ? `<details><summary>${esc(i.ko)}</summary>${i.sub.map(footLink).join('')}</details>` : footLink(i)).join('')}</div>`).join('');
 $('tabs').innerHTML = MOBILE_TABS.map(t => `<a href="${link(t[2])}">${esc(t[0])}</a>`).join('');
 
 const items = [...document.querySelectorAll('.nav-item')];
@@ -672,3 +739,4 @@ render();
 pollLive().then(refresh);
 setInterval(pulse, 2000);
 setInterval(() => pollLive(), 5000);
+setInterval(pollChartSymbols, 10000);

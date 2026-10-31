@@ -8,7 +8,7 @@ function newState() {
   return {
     v: 1, seq: 1, offset: 0, vol: 0,
     bal: { USDT: START_USDT },
-    orders: [], pos: [], stakes: [], loans: [], bots: [], hist: [], claimed: {}, tickets: [],
+    orders: [], pos: [], stakes: [], loans: [], bots: [], hist: [], claimed: {}, tickets: [], extPx: {},
   };
 }
 
