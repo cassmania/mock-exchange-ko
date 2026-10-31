@@ -91,7 +91,10 @@ h3 { margin: 0 0 10px; font-size: 16px; }
 #view.wide .mini:hover { color: #fff; }
 .trade { display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
 .trade-chart iframe { display: block; width: 100%; height: calc(100vh - 96px); min-height: 720px; border: 0; }
-.trade-side { padding: 8px; height: calc(100vh - 96px); min-height: 720px; overflow: auto; border-left: 1px solid var(--line); }
+/* 주문창은 스크롤해도 화면에 남긴다. 60px은 고정 헤더 높이(안내 띠는 함께 올라간다) */
+.trade-main { min-width: 0; }
+.trade-side { padding: 8px; position: sticky; top: 60px; align-self: start; height: calc(100vh - 60px); overflow: auto; border-left: 1px solid var(--line); }
+.order-title { margin: 0; font-size: 15px; }
 .trade-side .t-top { gap: 8px; padding: 10px 12px; margin-bottom: 8px; }
 .trade-side .t-sym { font-size: 15px; width: 100%; }
 .trade-side .panel { margin-bottom: 8px; padding: 12px; }
@@ -184,7 +187,10 @@ th { color: var(--sub); font-weight: 500; font-size: 12px; border-top: 0; }
   .drop-col + .drop-col { border-left: 0; padding-left: 0; margin-left: 0; margin-top: 8px; }
   .grid { grid-template-columns: repeat(2, 1fr); }
   .trade { grid-template-columns: minmax(0, 1fr); }
-  .trade-side { height: auto; min-height: 0; border-left: 0; border-top: 1px solid var(--line); }
+  /* 좁은 화면 순서: 차트 → 주문 → 포지션 */
+  .trade-main { display: contents; }
+  .trade-chart { order: 1; } .trade-side { order: 2; } .trade-bottom { order: 3; }
+  .trade-side { position: static; height: auto; border-left: 0; border-top: 1px solid var(--line); }
   .hero { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {

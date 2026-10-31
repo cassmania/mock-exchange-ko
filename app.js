@@ -244,7 +244,7 @@ function openTrade(el, sym, draw, pathFor) {
   ensureSymbol(sym);
   el.classList.add('wide');
   setTradeTheme();
-  el.innerHTML = `<div class="trade"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT"></iframe></div><aside class="trade-side" id="trade-side"></aside></div><div class="trade-bottom" id="trade-bottom"></div>`;
+  el.innerHTML = `<div class="trade"><div class="trade-main"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT"></iframe></div><div class="trade-bottom" id="trade-bottom"></div></div><aside class="trade-side" id="trade-side"></aside></div>`;
   tradeCtx = { sym, draw, pathFor };
   draw(sym);
 }
@@ -267,6 +267,7 @@ function viewSpot(el, pair) {
 function drawSpot(sym) {
   $('trade-side').innerHTML = `<div id="t-top" class="t-top"></div>
     <form class="panel form" id="spot">
+      <h3 class="order-title">모의 주문</h3>
       <div class="seg"><label><input type="radio" name="type" value="market" checked>시장가</label><label><input type="radio" name="type" value="limit">지정가</label></div>
       <label>지정가 (USDT)<input name="limit" inputmode="decimal" placeholder="지정가 주문에만 사용"></label>
       <label>수량 (${esc(sym)})<input name="qty" inputmode="decimal" required></label>
@@ -309,11 +310,12 @@ function drawFutures(sym, q, inverse, tabAi) {
   const settle = inverse ? sym : q;
   $('trade-side').innerHTML = `<div id="t-top" class="t-top"></div>
     <form class="panel form" id="fut">
+      <h3 class="order-title">모의 주문</h3>
       <label>증거금 (${esc(settle)})<input name="margin" inputmode="decimal" required></label>
       <label>레버리지 <output id="levv">10배</output><input type="range" name="lev" min="1" max="200" value="10"></label>
       <div class="two"><label>익절가<input name="tp" inputmode="decimal" placeholder="선택"></label><label>손절가<input name="sl" inputmode="decimal" placeholder="선택"></label></div>
       <p class="muted" id="fut-bal"></p>
-      <div class="two"><button class="btn up-bg" value="long">롱</button><button class="btn down-bg" value="short">숏</button></div>
+      <div class="two"><button class="btn up-bg" value="long">롱 (매수)</button><button class="btn down-bg" value="short">숏 (매도)</button></div>
     </form>${tabAi ? '<div class="panel" id="ai"></div>' : ''}<div class="panel" id="book"></div>`;
   $('trade-bottom').innerHTML = '<div class="panel"><h3>포지션 <span class="muted" id="pos-n"></span></h3><div id="pos"></div></div>';
   tradeTop(sym, inverse ? `${sym}/USD 코인 마진` : `${sym}/${q} 무기한`, `${nameOf(sym)} · 모의 선물`);
