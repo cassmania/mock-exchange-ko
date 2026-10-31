@@ -2359,7 +2359,7 @@ function applyLiveCandle(c, confirmed) {
   if (!Number.isFinite(c.volume)) c.volume = 0;
   const price = c.close, d2 = dp();
   const chg = chg24For(sym);
-  mock?.tick(sym, price, chg);
+  mock?.tick(sym, price, chg, activeExchange);
   document.getElementById('priceEl').textContent = price.toFixed(d2);
   document.getElementById('priceEl').style.color = chg == null ? '' : chg >= 0 ? '#12a150' : '#d64545';
   const cEl = document.getElementById('chgEl');
@@ -3323,7 +3323,7 @@ function renderPriceBox({symbol, exchange, price, chgPct, d2}) {
 }
 
 function updatePanelTag(idx, symbol, price, chgPct, d2) {
-  if (symbol && Number.isFinite(price)) mock?.tick(symbol, price, chgPct);
+  if (symbol && Number.isFinite(price)) mock?.tick(symbol, price, chgPct, idx === 1 ? activeExchange : splitCharts.find(x => x.idx === idx)?.exchange);
   const symEl = document.getElementById(`ptSym${idx}`);
   const priceEl = document.getElementById(`ptPrice${idx}`);
   const chgEl = document.getElementById(`ptChg${idx}`);

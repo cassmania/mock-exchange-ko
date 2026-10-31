@@ -77,44 +77,48 @@ const addLive = fn => { live.push(fn); fn(); };
 function refresh() {
   live.forEach(fn => fn());
   $('equity').textContent = fmt(E.equity(state, prices()), 2);
-  $('feed').textContent = feed === 'live' ? '실시간 시세 + 모의 체결' : '시뮬레이션 시세';
+  $('feed').textContent = feed === 'live' ? 'Bybit 선물 시세 + 모의 체결' : feed === 'spot' ? 'Binance 현물 시세(대체) + 모의 체결' : '시뮬레이션 시세';
 }
 function liveHtml(el, fn) { addLive(() => { const n = el(); if (n) n.innerHTML = fn(); }); }
 const liveId = (id, fn) => liveHtml(() => $(id), fn);
 
-async function pollLive() {
-  try {
-    const syms = Object.keys(SYMBOLS).filter(k => SYMBOLS[k][3]);
-    const q = encodeURIComponent(JSON.stringify(syms.map(k => k + 'USDT')));
-    const r = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${q}`);
-    if (!r.ok) throw new Error(r.status);
-    for (const x of await r.json()) {
-      const k = x.symbol.replace('USDT', '');
-      if (Date.now() - (market[k].ext || 0) < 15000) continue;
-      market[k].price = Number(x.lastPrice);
-      market[k].open = Number(x.openPrice);
-    }
-    feed = 'live';
-  } catch { feed = 'sim'; }
+// 모든 코인 가격의 기준은 차트와 같은 Bybit 무기한 선물이다. 현물은 Bybit 장애 때만 대신 쓴다.
+const bybitListed = new Set();
+async function pollBybit() {
+  const d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear')).json();
+  const map = new Map(d.result.list.map(t => [t.symbol, t]));
+  for (const k of Object.keys(SYMBOLS)) {
+    if (isSim(k)) continue;
+    // PEPE처럼 값이 작은 코인은 Bybit에 1000PEPEUSDT로 상장돼 가격이 1000배다
+    const t = map.get(k + 'USDT'), t1000 = map.get('1000' + k + 'USDT');
+    if (!t && !t1000) continue;
+    bybitListed.add(k);
+    if (Date.now() - (market[k].ext || 0) < 15000) continue;
+    const x = t || t1000;
+    window.MOCK_CHART.tick(k + 'USDT', Number(x.lastPrice) / (t ? 1 : 1000), Number(x.price24hPcnt) * 100, 'Bybit');
+    market[k].ext = 0;
+  }
 }
-// 차트 앱이 꺼진 동안에도 차트에서 고른 종목의 가격을 이어 받는다
-async function pollChartSymbols() {
-  const keys = Object.keys(SYMBOLS).filter(k => SYMBOLS[k][2] === 'chart');
-  if (!keys.length) return;
-  try {
-    const d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear')).json();
-    const map = new Map(d.result.list.map(t => [t.symbol, t]));
-    for (const k of keys) {
-      const t = map.get(k + 'USDT');
-      if (!t || Date.now() - (market[k].ext || 0) < 15000) continue;
-      window.MOCK_CHART.tick(k + 'USDT', Number(t.lastPrice), Number(t.price24hPcnt) * 100);
-      market[k].ext = 0;
-    }
-  } catch { /* 다음 주기에 다시 받는다 */ }
+async function pollSpot() {
+  const syms = Object.keys(SYMBOLS).filter(k => SYMBOLS[k][3]);
+  const q = encodeURIComponent(JSON.stringify(syms.map(k => k + 'USDT')));
+  const r = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${q}`);
+  if (!r.ok) throw new Error(r.status);
+  for (const x of await r.json()) {
+    const k = x.symbol.replace('USDT', '');
+    market[k].price = Number(x.lastPrice);
+    market[k].open = Number(x.openPrice);
+  }
+}
+async function pollLive() {
+  try { await pollBybit(); feed = 'live'; }
+  catch {
+    try { await pollSpot(); feed = 'spot'; } catch { feed = 'sim'; }
+  }
 }
 function walkSim() {
   for (const k in market) {
-    if (SYMBOLS[k][2] === 'chart' || (SYMBOLS[k][3] && feed === 'live')) continue;
+    if (SYMBOLS[k][2] === 'chart' || (SYMBOLS[k][3] && feed !== 'sim')) continue;
     market[k].price *= 1 + (Math.random() - 0.5) * 0.002;
   }
 }
@@ -208,9 +212,11 @@ window.MOCK_CHART = {
     for (const k in SYMBOLS) if (isSim(k)) map.set(k + 'USDT', { price: px(k), chg: chg(k) });
     return map;
   },
-  tick(s, price, change) {
+  tick(s, price, change, ex) {
     const b = baseOf(s);
     if (!SYMBOLS[b] || isSim(b)) return;
+    // 차트가 다른 거래소로 대체해 그린 값은, Bybit에 있는 코인이면 손익 기준에 넣지 않는다
+    if (ex && ex !== 'Bybit' && bybitListed.has(b)) return;
     const m = market[b];
     m.price = price;
     m.ext = Date.now();
@@ -795,4 +801,3 @@ render();
 pollLive().then(refresh);
 setInterval(pulse, 2000);
 setInterval(() => pollLive(), 5000);
-setInterval(pollChartSymbols, 10000);
