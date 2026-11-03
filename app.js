@@ -263,8 +263,54 @@ function bookHtml(sym) {
   return `<div class="book-head"><span>모의 호가</span><span>수량</span></div>${asks}<div class="book-mid">${fmtP(p)}</div>${bids}`;
 }
 function tradeTop(sym, label, sub) {
-  liveId('t-top', () => `<b class="t-sym">${esc(label)}</b><span class="t-price">${fmtP(px(sym))}</span>${pct(sym)}<span class="muted">${esc(sub)}</span>`);
+  liveId('t-top', () => {
+    const on = favList().includes(sym);
+    return `<b class="t-sym">${esc(label)}<button type="button" class="star${on ? ' on' : ''}" data-do="favtoggle" data-sym="${esc(sym)}" aria-pressed="${on}" aria-label="${esc(sym)} 즐겨찾기 ${on ? '해제' : '추가'}" title="즐겨찾기 ${on ? '해제' : '추가'}">${on ? '★' : '☆'}</button></b><span class="t-price">${fmtP(px(sym))}</span>${pct(sym)}<span class="muted">${esc(sub)}</span>`;
+  });
+  favPanel(sym);
 }
+
+/* ---------- 즐겨찾기 ----------
+   차트 앱과 같은 사이트 저장소의 'favs'(예: "BTCUSDT") 목록을 함께 쓴다. 차트 쪽 별·칩과 늘 같은 목록이다. */
+const chartWin = () => { try { return document.querySelector('.trade-chart iframe')?.contentWindow || null; } catch { return null; } };
+function favList() {
+  try {
+    const v = JSON.parse(localStorage.getItem('favs') || '[]');
+    return Array.isArray(v) ? v.filter(s => typeof s === 'string' && /^[A-Z0-9]{1,20}USDT$/.test(s)).map(s => s.slice(0, -4)) : [];
+  } catch { return []; }
+}
+function toggleFavSym(sym) {
+  if (!SYM_RE.test(sym)) return;
+  const w = chartWin();
+  // 차트 함수로 바꿔야 차트 상단 칩과 별 표시도 바로 갱신된다
+  if (w && typeof w.toggleFav === 'function') w.toggleFav(sym + 'USDT');
+  else {
+    const list = favList().map(s => s + 'USDT'), i = list.indexOf(sym + 'USDT');
+    if (i >= 0) list.splice(i, 1); else list.unshift(sym + 'USDT');
+    try { localStorage.setItem('favs', JSON.stringify(list)); } catch { /* 저장 불가 환경 */ }
+  }
+  refresh();
+}
+function goFav(sym) {
+  if (!SYM_RE.test(sym) || !tradeCtx || sym === tradeCtx.sym) return;
+  const w = chartWin();
+  if (w && typeof w.selectCoin === 'function') w.selectCoin(sym + 'USDT');
+  else location.hash = link(tradeCtx.pathFor(sym));
+}
+function favPanel(sym) {
+  const box = $('fav-box');
+  if (!box) return;
+  try { box.open = localStorage.getItem('fav-open') === '1'; } catch { /* 기본은 접힘 */ }
+  box.addEventListener('toggle', () => { try { localStorage.setItem('fav-open', box.open ? '1' : '0'); } catch { /* 무시 */ } });
+  liveId('fav-n', () => favList().length);
+  liveId('fav-list', () => {
+    const list = favList();
+    if (!list.length) return '<p class="muted fav-empty">종목 이름 옆 ☆를 누르면 여기에 모입니다.</p>';
+    list.forEach(s => ensureSymbol(s));
+    return list.map(s => `<div class="fav-item${s === sym ? ' cur' : ''}"><button type="button" class="fav-go" data-do="favgo" data-sym="${esc(s)}"><b>${esc(s)}</b><span>${fmtP(px(s))}</span>${pct(s)}</button><button type="button" class="fav-x" data-do="favtoggle" data-sym="${esc(s)}" aria-label="${esc(s)} 즐겨찾기 해제" title="해제">×</button></div>`).join('');
+  });
+}
+const FAV_BOX = '<details class="panel fav-box" id="fav-box"><summary>★ 즐겨찾기 <span class="muted" id="fav-n"></span></summary><div class="fav-list" id="fav-list"></div></details>';
 
 /* ---------- 현물 ---------- */
 function viewSpot(el, pair) {
@@ -279,7 +325,7 @@ function drawSpot(sym) {
       <label>수량 (${esc(sym)})<input name="qty" inputmode="decimal" required></label>
       <p class="muted" id="spot-bal"></p>
       <div class="two"><button class="btn up-bg" value="buy">매수</button><button class="btn down-bg" value="sell">매도</button></div>
-    </form><div class="panel" id="book"></div>`;
+    </form>${FAV_BOX}<div class="panel" id="book"></div>`;
   $('trade-bottom').innerHTML = '<div class="panel"><h3>미체결 주문</h3><div id="orders"></div></div>';
   tradeTop(sym, `${sym}/USDT`, `${nameOf(sym)} · 모의 현물`);
   liveId('book', () => bookHtml(sym));
@@ -326,7 +372,7 @@ function drawFutures(sym, q, inverse, tabAi) {
       <p class="muted" id="fut-bal"></p>
       <div class="calc" id="fut-calc"></div>
       <div class="two"><button class="btn up-bg" value="long">롱 (매수)</button><button class="btn down-bg" value="short">숏 (매도)</button></div>
-    </form>${tabAi ? '<div class="panel" id="ai"></div>' : ''}<div class="panel" id="book"></div>`;
+    </form>${FAV_BOX}${tabAi ? '<div class="panel" id="ai"></div>' : ''}<div class="panel" id="book"></div>`;
   $('trade-bottom').innerHTML = '<div class="panel"><h3>포지션 <span class="muted" id="pos-n"></span></h3><div id="pos"></div></div>';
   tradeTop(sym, inverse ? `${sym}/USD 코인 마진` : `${sym}/${q} 무기한`, `${nameOf(sym)} · 모의 선물`);
   const levForm = $('fut'), levNum = $('lev-num');
@@ -732,6 +778,8 @@ function done() {
 }
 
 const ACTIONS = {
+  favgo: d => goFav(d.sym),
+  favtoggle: d => toggleFavSym(d.sym),
   cancel: d => attempt(() => E.cancelOrder(state, +d.id), '주문을 취소했습니다'),
   closepos: d => attempt(() => { const p = state.pos.find(x => x.id === +d.id); E.closePos(state, +d.id, px(p.sym), '시장가 청산'); }, '시장가로 청산했습니다'),
   automargin: d => attempt(() => toast(`자동 마진을 ${E.toggleAuto(state, +d.id) ? '켰습니다' : '껐습니다'}`)),

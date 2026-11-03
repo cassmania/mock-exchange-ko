@@ -99,6 +99,24 @@ h3 { margin: 0 0 10px; font-size: 16px; }
 .acct-main > span:first-child { width: 100%; }
 .acct-main b { font-size: 20px; font-weight: 700; color: var(--text); }
 .acct-main small { font-size: 12px; font-weight: 400; color: var(--sub); }
+.star { margin-left: 6px; font-size: 17px; line-height: 1; color: var(--sub); vertical-align: -1px; }
+.star:hover, .star.on { color: #e0a100; }
+.fav-box { padding: 0 !important; }
+.fav-box summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; padding: 10px 12px; font-size: 14px; font-weight: 600; }
+.fav-box summary::-webkit-details-marker { display: none; }
+.fav-box summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 2px solid var(--sub); border-bottom: 2px solid var(--sub); transform: rotate(45deg); transition: transform .18s ease-out; }
+.fav-box[open] summary::after { transform: rotate(-135deg); }
+.fav-list { max-height: 220px; overflow: auto; padding: 0 6px 8px; border-top: 1px solid var(--line); }
+.fav-item { display: flex; align-items: center; border-radius: 6px; }
+.fav-item:hover { background: var(--soft); }
+.fav-item.cur { background: color-mix(in srgb, var(--blue) 10%, transparent); }
+.fav-go { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr auto 62px; gap: 8px; align-items: center; padding: 7px 6px; font-size: 12.5px; text-align: left; font-variant-numeric: tabular-nums; color: var(--text); }
+.fav-go b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav-go > span:last-child { text-align: right; }
+.fav-x { flex: none; width: 26px; height: 26px; border-radius: 6px; color: var(--sub); font-size: 16px; }
+.fav-x:hover { color: var(--down); background: var(--soft); }
+.fav-empty { padding: 10px 6px 2px; margin: 0; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .fav-box summary::after { transition: none; } }
 .lev-field { display: flex; flex-direction: column; gap: 6px; }
 .lev-label { font-size: 13px; color: var(--sub); }
 .lev-row { display: flex; align-items: center; gap: 6px; }
@@ -252,6 +270,6 @@ th { color: var(--sub); font-weight: 500; font-size: 12px; border-top: 0; }
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="menu-data.js"></script>
 <script src="sim-engine.js?v=3"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
