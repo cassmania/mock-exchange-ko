@@ -361,7 +361,7 @@ function posTable() {
   return `<div class="tw"><table class="pos-table"><thead><tr><th>코인</th><th>방향</th><th>레버리지</th><th class="r">포지션 크기</th><th class="r">진입가</th><th class="r">현재가</th><th class="r">청산가</th><th class="r">투입 마진</th><th>자동 마진</th><th class="r">미실현 손익</th><th>액션</th></tr></thead><tbody>${list.map(p => {
     const pnl = E.posPnl(p, px(p.sym));
     const long = p.side === 'long';
-    return `<tr><td><b>${esc(p.sym)}</b></td><td><span class="side ${long ? 'long' : 'short'}">${long ? '롱' : '숏'}</span></td><td>${p.lev}배</td><td class="r">${fmt(p.qty, 6)} ${p.inverse ? 'USD' : esc(p.sym)}</td><td class="r">${fmtP(p.entry)}</td><td class="r">${fmtP(px(p.sym))}</td><td class="r down">${p.liq > 0 ? fmtP(p.liq) : '-'}</td><td class="r">${fmt(p.margin, 4)} ${esc(p.settle)}</td>
+    return `<tr><td><button type="button" class="pos-go" data-do="posgo" data-id="${p.id}" title="${esc(p.sym)} 차트 보기"><b>${esc(p.sym)}</b></button></td><td><span class="side ${long ? 'long' : 'short'}">${long ? '롱' : '숏'}</span></td><td>${p.lev}배</td><td class="r">${fmt(p.qty, 6)} ${p.inverse ? 'USD' : esc(p.sym)}</td><td class="r">${fmtP(p.entry)}</td><td class="r">${fmtP(px(p.sym))}</td><td class="r down">${p.liq > 0 ? fmtP(p.liq) : '-'}</td><td class="r">${fmt(p.margin, 4)} ${esc(p.settle)}</td>
       <td><button class="sw ${p.auto ? 'on' : ''}" role="switch" aria-checked="${!!p.auto}" aria-label="${esc(p.sym)} 자동 마진" data-do="automargin" data-id="${p.id}"></button></td>
       <td class="r">${signed(pnl, ' ' + esc(p.settle))} <span class="${pnl >= 0 ? 'up' : 'down'}">(${(pnl / p.margin * 100).toFixed(2)}%)</span></td>
       <td class="pos-acts"><button class="act act-close" data-do="closepos" data-id="${p.id}">시장가 청산</button><button class="act act-rev" data-do="reverse" data-id="${p.id}">역방향</button><button class="act act-add" data-do="addmargin" data-id="${p.id}">마진 추가</button></td></tr>`;
@@ -793,6 +793,13 @@ function done() {
 
 const ACTIONS = {
   favgo: d => goFav(d.sym),
+  posgo: d => {
+    const p = state.pos.find(x => x.id === +d.id);
+    if (!p) return;
+    const path = p.inverse ? `/futures/coin-m/${p.sym}_USD` : `/futures/${p.sym}_${p.settle}`;
+    if (tradeCtx && tradeCtx.pathFor(p.sym) === path) goFav(p.sym); else location.hash = link(path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
   favtoggle: d => toggleFavSym(d.sym),
   cancel: d => attempt(() => E.cancelOrder(state, +d.id), '주문을 취소했습니다'),
   closepos: d => attempt(() => { const p = state.pos.find(x => x.id === +d.id); E.closePos(state, +d.id, px(p.sym), '시장가 청산'); }, '시장가로 청산했습니다'),
