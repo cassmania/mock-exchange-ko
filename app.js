@@ -98,6 +98,20 @@ async function pollBybit() {
     window.MOCK_CHART.tick(k + 'USDT', Number(x.lastPrice) / (t ? 1 : 1000), Number(x.price24hPcnt) * 100, 'Bybit');
     market[k].ext = 0;
   }
+  // VTHO·FET처럼 Bybit에 없는 코인은 차트를 열어둘 때만 값이 들어와 포지션 시세가 멈췄다. Binance 선물로 채운다.
+  const miss = Object.keys(SYMBOLS).filter(k => !isSim(k) && !bybitListed.has(k) && !SYMBOLS[k][3] && Date.now() - (market[k].ext || 0) >= 15000);
+  if (miss.length) await pollBinanceFut(miss).catch(() => {});
+}
+async function pollBinanceFut(keys) {
+  const r = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+  if (!r.ok) throw new Error(r.status);
+  const map = new Map((await r.json()).map(t => [t.symbol, t]));
+  for (const k of keys) {
+    const t = map.get(k + 'USDT'), t1000 = map.get('1000' + k + 'USDT'), x = t || t1000;
+    if (!x) continue;
+    window.MOCK_CHART.tick(k + 'USDT', Number(x.lastPrice) / (t ? 1 : 1000), Number(x.priceChangePercent), 'Binance');
+    market[k].ext = 0;
+  }
 }
 async function pollSpot() {
   const syms = Object.keys(SYMBOLS).filter(k => SYMBOLS[k][3]);
