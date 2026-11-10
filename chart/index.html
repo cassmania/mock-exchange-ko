@@ -13,13 +13,12 @@
 <script src="./indicator_engine.js?v=1"></script>
 <script src="./custom.js?v=1"></script>
 <script src="./trade-marks.js?v=2"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{--bg:#1f1e1d;--bg2:#262624;--bg3:#30302e;--bd:#3e3d39;--tx:#ece9e1;--tx2:#a29d92;--tx3:#6b675f;--tx-strong:#faf9f5;--g:#3fb87a;--r:#e5675e;--b:#d97757;--y:#d4a24c;--p:#a48be0;--c:#4fb3a9;
-  --font-h:'Source Serif 4','Iowan Old Style',Georgia,'Malgun Gothic',serif;--font-b:'Inter','Pretendard','Malgun Gothic',-apple-system,sans-serif;}
-body.light-mode{--bg:#f5f4ee;--bg2:#fbfaf6;--bg3:#efede5;--bd:#e3dfd3;--tx:#1f1e1b;--tx2:#74706a;--tx3:#a8a296;--tx-strong:#141413;--g:#12a150;--r:#d64545;--b:#c96442;--y:#b7791f;--p:#8b6fd6;--c:#2aa198;}
+/* 2026-11-11 바깥 틀과 같은 Apple 색으로 통일. 상승·하락·지표 색(--g --r --y --p --c)과 지지·저항선 색은 그대로 둔다 */
+:root{--bg:#000;--bg2:#1c1c1e;--bg3:#2c2c2e;--bd:#38383a;--tx:#f5f5f7;--tx2:#98989d;--tx3:#636366;--tx-strong:#fff;--g:#3fb87a;--r:#e5675e;--b:#0a84ff;--y:#d4a24c;--p:#a48be0;--c:#4fb3a9;
+  --font-h:-apple-system,BlinkMacSystemFont,'SF Pro Display','Apple SD Gothic Neo','Pretendard Variable',Pretendard,'Malgun Gothic','Segoe UI',sans-serif;--font-b:-apple-system,BlinkMacSystemFont,'SF Pro Text','Apple SD Gothic Neo','Pretendard Variable',Pretendard,'Malgun Gothic','Segoe UI',sans-serif;}
+body.light-mode{--bg:#f5f5f7;--bg2:#fff;--bg3:#f0f0f3;--bd:#e5e5ea;--tx:#1d1d1f;--tx2:#6e6e73;--tx3:#a1a1a6;--tx-strong:#000;--g:#12a150;--r:#d64545;--b:#0071e3;--y:#b7791f;--p:#8b6fd6;--c:#2aa198;}
 html,body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--font-b);font-size:13px;overflow:hidden;transition:background-color .15s,color .15s;}
 /* ── 레이아웃 ── */
 .app{display:flex;flex-direction:column;height:100vh;}
@@ -88,7 +87,8 @@ body.light-mode .panel-tag{box-shadow:0 2px 6px rgba(30,40,90,.12);}
 .trust.ok{color:var(--y);background:color-mix(in srgb,var(--y) 15%,transparent);}
 .trust.rnd{color:var(--tx2);background:var(--bg3);}
 .trust.bad{color:var(--r);background:color-mix(in srgb,var(--r) 13%,transparent);}
-.trust-box summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.trust-box summary .sb-ttl{white-space:nowrap;}
+.trust-box summary{flex-wrap:wrap;row-gap:4px;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:6px;}
 .trust-box summary::-webkit-details-marker{display:none;}
 .trust-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;}
 .trust-tbl td{padding:5px 2px;border-top:1px solid var(--bd);vertical-align:top;color:var(--tx);}
@@ -370,7 +370,7 @@ body.light-mode .panel-tag{box-shadow:0 2px 6px rgba(30,40,90,.12);}
 <!-- 사이드바 -->
 <div class="sidebar">
 <div class="sb-scroll">
-  <details class="sb-sec trust-box" open>
+  <details class="sb-sec trust-box">
     <summary><div class="sb-ttl" style="margin-bottom:0">지표 신뢰도 · 백테스트</div><span class="trust ok" title="이 화면의 지표·신호를 차트 코드 그대로 과거 데이터에 돌린 결과. 2026-11-10 종합 시그널과 실행 규칙을 다시 만들었습니다">2개 개선 · 나머지 참고용</span></summary>
     <table class="trust-tbl"><tr><td>종합 시그널 (방향 점수)<small>24봉 뒤 적중 52.3% · 평소 49.5% · 예전 방식 46.6%. 처음 보는 종목에서도 +2.3%p</small></td><td><span class="trust ok">기준보다 높음</span></td></tr><tr><td>실행 규칙 · 차트 타점<small>+0.27R · 무작위 진입 +0.05R · 승률 29% (크게 이기고 자주 짐)</small></td><td><span class="trust ok">기준보다 높음</span></td></tr><tr><td>과매수·과매도 (RSI·CCI·스토캐)<small>반전 방향 적중이 기준보다 +2~7%p. 반대 신호까지 들고 있으면 −0.08~−0.18R</small></td><td><span class="trust ok">방향만 참고</span></td></tr><tr><td>유동성 스윕 반전<small>적중 +1~4%p · 매매로는 −0.06~−0.13R</small></td><td><span class="trust ok">방향만 참고</span></td></tr><tr><td>보조지표 자동<small>과거로만 고른 지표의 다음 구간 성과 +0.01R</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>엘리엇 파동<small>방향 적중 ≈50% · 확신도 점수와 적중률 무관</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>구조 돌파 (AI MASTER)<small>돌파 뒤 되밀림이 더 잦음 (−2~−6%p)</small></td><td><span class="trust bad">기준보다 낮음</span></td></tr><tr><td>MA 배열·슈퍼트렌드·MACD<small>적중이 기준과 ±2%p 이내</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>지지·저항선<small>지킴률 48~51% = 1 ATR 옮긴 가짜 선과 같음</small></td><td><span class="trust rnd">무작위 수준</span></td></tr></table>
     <div class="trust-note">위 두 줄은 2026-11-10 검증: 가중치를 정한 구간(8종목 4시간봉 2022-09~2024-10) 밖의 기간·봉·종목 96개 시계열, 그중 8종목은 마지막에 한 번만 확인. 차이가 작아(2~4%p) 단독 매매 근거로는 부족합니다. 나머지는 2026-11-06 검증 · 이 차트 코드 그대로 · 바이낸스 8종목 × 1시간~일봉(앞·뒤 기간 나눠 확인) + 4시간봉 4년치 · 신호 다음 봉 진입 · 손절 2.5×ATR · 수수료 0.1% · 적중 기준 = 같은 기간 아무 때나 찍었을 때 · 15분봉은 모든 지표 손실 · 과거 결과이며 미래를 보장하지 않습니다</div>
@@ -794,8 +794,8 @@ let currentTheme = (() => { try { return localStorage.getItem('theme') || 'light
 
 function chartColors() {
   return currentTheme === 'light'
-    ? { bg:'#fbfaf6', text:'#74706a', grid:'#eeebe2', border:'#e3dfd3' }
-    : { bg:'#262624', text:'#a29d92', grid:'#30302e', border:'#3e3d39' };
+    ? { bg:'#ffffff', text:'#6e6e73', grid:'#f0f0f3', border:'#e5e5ea' }
+    : { bg:'#1c1c1e', text:'#98989d', grid:'#2c2c2e', border:'#38383a' };
 }
 
 function applyThemeClass() {
@@ -1959,7 +1959,13 @@ function doAdaptive(rows) {
 
 function doSignal(rows=getSignalRows()){
   if (selectedPanelIdx !== 1) return;
-  document.getElementById('sigRow').innerHTML=renderCompositeSignal(attachTradePlan(CoinAnalysis.compositeSignal(rows),rows),frVal);
+  const sg=attachTradePlan(CoinAnalysis.compositeSignal(rows),rows);
+  document.getElementById('sigRow').innerHTML=renderCompositeSignal(sg,frVal);
+  sendJudge(sg,sym,tf,dp());
+}
+// 모의 거래소 위쪽 판단 카드(방향 점수·실행 규칙)에 같은 계산 결과를 넘긴다
+function sendJudge(sg,symbol,tfArg,digits){
+  mock?.signal?.({symbol,tf:tfArg,ready:!!sg?.ready,score:sg?.score,label:sg?.label,direction:sg?.direction,strength:sg?.strength,plan:sg?.plan||null,digits});
 }
 
 function updOHLC(c){
@@ -3399,6 +3405,7 @@ function applySnapshotToSidebar(item) {
   if (!snap) return;
   updateDataContext(item.symbol,item.exchange,item.tf,item.fetchedAt||Date.now());
   renderSidebarSnapshot(snap, rows,item.tf,item.exchange);
+  sendJudge(snap.signal,item.symbol,item.tf,snap.d2);
   safeRun('RSI(분할)', () => doRSI(14, rows));
   safeRun('MACD(분할)', () => doMACD(12, 26, 9, rows));
   safeRun('CCI(분할)', () => doCCI(20, rows));

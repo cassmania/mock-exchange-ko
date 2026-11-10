@@ -249,14 +249,67 @@ window.MOCK_CHART = {
   },
   theme(light) {
     chartLight = light;
-    if (tradeCtx) setTradeTheme();
+    setTradeTheme();
+  },
+  // 차트가 종합 시그널을 다시 계산할 때마다 부른다 → 위쪽 판단 카드 갱신
+  signal(p) {
+    lastSignal = p;
+    drawJudge();
   },
 };
 let tradeCtx = null;
 let chartLight = (() => { try { return (localStorage.getItem('theme') || 'light') === 'light'; } catch { return true; } })();
 function setTradeTheme() {
-  $('view').classList.toggle('cream', chartLight);
-  $('view').classList.toggle('charcoal', !chartLight);
+  document.documentElement.classList.toggle('dark', !chartLight);
+}
+setTradeTheme();
+
+/* ---------- 판단 카드 3장(템플릿 C) ----------
+   방향 점수·실행 규칙은 차트(chart/index.html)가 계산해 MOCK_CHART.signal로 넘긴 값만 그린다.
+   검증 수치 출처: 사이트-백테스트-비교/results/upgrade-final.txt (2026-11-10) */
+let lastSignal = null, judgeKey = '';
+const TF_KO = { '1m': '1분', '3m': '3분', '5m': '5분', '15m': '15분', '30m': '30분', '1h': '1시간', '2h': '2시간', '4h': '4시간', '6h': '6시간', '12h': '12시간', '1d': '일', '1w': '주', '1M': '월' };
+const TRUST_CARD = `<div class="jcard"><div class="jt">지표 신뢰도 · 백테스트</div>
+<div class="jtr"><span>종합 시그널</span><span class="chip up">기준보다 높음</span></div>
+<div class="jtr"><span>실행 규칙 · 차트 타점</span><span class="chip up">기준보다 높음</span></div>
+<div class="jtr"><span>과매수·과매도</span><span class="chip">방향만 참고</span></div>
+<div class="jtr"><span>파동·지지저항 등 6종</span><span class="chip">참고용</span></div>
+<p class="jfoot">과거 결과이며 미래를 보장하지 않습니다. 자세한 표는 차트 옆 ‘지표 신뢰도’.</p></div>`;
+function judgeHtml(p) {
+  const wait = msg => `<div class="jcard"><div class="jt">방향 점수 · 24봉 뒤</div><p class="muted">${msg}</p></div><div class="jcard"><div class="jt">실행 규칙</div><p class="muted">${msg}</p></div>` + TRUST_CARD;
+  if (!p) return wait('차트에서 계산하는 중입니다.');
+  if (!p.ready || !Number.isFinite(p.score)) return wait('확정봉이 모자라 계산할 수 없습니다.');
+  const s = p.score, sg = (v, d = 2) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d);
+  const cls = p.direction === 'LONG_BIAS' ? 'up' : p.direction === 'SHORT_BIAS' ? 'down' : '';
+  const hit = p.strength === 'strong' ? '53.5% · 평소 49.5%' : p.strength === 'weak' ? '52.3% · 평소 49.5%' : '관망 구간 · 평소와 같음';
+  const where = `${esc(String(p.symbol || '').replace(/USDT$/, ''))} ${TF_KO[p.tf] || esc(p.tf || '')}봉`;
+  const k1 = `<div class="jcard"><div class="jt">방향 점수 · ${where} · 24봉 뒤</div>
+<div class="jrow"><span class="jbig ${cls}">${sg(s)}</span><span class="chip ${cls}">${esc(p.label || '')}</span></div>
+<div class="gauge" role="img" aria-label="방향 점수 ${sg(s)}, 범위 −0.58에서 +0.58"><i style="left:${Math.max(2, Math.min(98, 50 + s / 0.58 * 50)).toFixed(1)}%"></i></div>
+<div class="gscale"><span>하락 −0.20</span><span>관망</span><span>상승 +0.20</span></div>
+<div class="jkv"><span>검증 적중</span><b>${hit}</b></div></div>`;
+  const pl = p.plan;
+  let k2;
+  if (!pl || pl.agree == null) k2 = `<div class="jcard"><div class="jt">실행 규칙</div><p class="muted">확정봉 210개가 필요합니다.</p></div>`;
+  else {
+    const dir = pl.agree === 5 ? 1 : pl.agree === -5 ? -1 : 0, side = dir === 1 ? '롱' : '숏';
+    const c = [dir !== 0, pl.adx >= 20, dir !== 0 && dir * s >= 0], n = c.filter(Boolean).length, ok = n === 3;
+    const ck = (y, t) => `<div class="jck"><i class="${y ? 'y' : ''}">${y ? '✓' : '–'}</i>${t}</div>`;
+    const exit = pl.agree <= -3 ? '롱 보유 중이면 청산' : pl.agree >= 3 ? '숏 보유 중이면 청산' : '';
+    const stop = ok && Number.isFinite(pl.atr) ? (pl.close - dir * 2.5 * pl.atr).toFixed(Number.isInteger(p.digits) ? Math.max(0, Math.min(8, p.digits)) : 2) : '';
+    k2 = `<div class="jcard"><div class="jt">실행 규칙</div>
+<div class="jrow"><span class="jstate ${ok ? (dir === 1 ? 'up' : 'down') : ''}">${ok ? side + ' 조건 충족' : dir ? side + ' 보류' : '대기'}</span><span class="chip">조건 ${n} / 3</span></div>
+<div style="margin-top:6px">${ck(c[0], `추세 합의 ${sg(pl.agree, 0)} / 5`)}${ck(c[1], `ADX ${Number.isFinite(pl.adx) ? pl.adx.toFixed(0) : '—'} (20 이상 필요)`)}${ck(c[2], '방향 점수 같은 쪽')}</div>
+${stop ? `<div class="jkv"><span>손절 (2.5×ATR)</span><b>${stop}</b></div>` : exit ? `<div class="jkv"><span>보유 중이라면</span><b>${exit}</b></div>` : ''}
+<div class="jkv"><span>검증 기대값 · 승률 29%</span><b>+0.27R · 무작위 +0.05R</b></div></div>`;
+  }
+  return k1 + k2 + TRUST_CARD;
+}
+function drawJudge() {
+  const el = $('judge');
+  if (!el) return;
+  const html = judgeHtml(lastSignal);
+  if (html !== judgeKey || !el.firstChild) el.innerHTML = judgeKey = html;
 }
 function openTrade(el, sym, draw, pathFor) {
   sym = sym.toUpperCase();
@@ -264,8 +317,10 @@ function openTrade(el, sym, draw, pathFor) {
   ensureSymbol(sym);
   el.classList.add('wide');
   setTradeTheme();
-  el.innerHTML = `<div class="trade"><div class="trade-main"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT&v=20261110"></iframe></div><div class="trade-bottom" id="trade-bottom"></div></div><aside class="trade-side" id="trade-side"></aside></div>`;
+  lastSignal = null;
+  el.innerHTML = `<section class="judge" id="judge" aria-label="신호 요약"></section><div class="trade"><div class="trade-main"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT&v=20261111"></iframe></div><div class="trade-bottom" id="trade-bottom"></div></div><aside class="trade-side" id="trade-side"></aside></div>`;
   tradeCtx = { sym, draw, pathFor };
+  drawJudge();
   draw(sym);
 }
 function bookHtml(sym) {
