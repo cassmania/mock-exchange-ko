@@ -7,13 +7,12 @@
 <title>모의 거래 차트</title>
 <meta name="robots" content="noindex">
 <script src="./vendor/lightweight-charts.js"></script>
-<script src="./analysis-engine.js?v=20260905"></script>
-<script src="./backtest/results/summary.js?v=20260905"></script>
+<script src="./analysis-engine.js?v=20261110"></script>
 <script src="./v3-analysis.js"></script>
 <script src="./v41-analysis.js"></script>
 <script src="./indicator_engine.js?v=1"></script>
 <script src="./custom.js?v=1"></script>
-<script src="./trade-marks.js?v=1"></script>
+<script src="./trade-marks.js?v=2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
 <style>
@@ -372,9 +371,9 @@ body.light-mode .panel-tag{box-shadow:0 2px 6px rgba(30,40,90,.12);}
 <div class="sidebar">
 <div class="sb-scroll">
   <details class="sb-sec trust-box" open>
-    <summary><div class="sb-ttl" style="margin-bottom:0">지표 신뢰도 · 백테스트</div><span class="trust bad" title="이 화면의 지표·신호를 차트 코드 그대로 과거 데이터에 돌린 결과">대부분 무작위 수준</span></summary>
-    <table class="trust-tbl"><tr><td>과매수·과매도 (RSI·CCI·스토캐)<small>반전 방향 적중이 기준보다 +2~7%p. 반대 신호까지 들고 있으면 −0.08~−0.18R</small></td><td><span class="trust ok">방향만 참고</span></td></tr><tr><td>유동성 스윕 반전<small>적중 +1~4%p · 매매로는 −0.06~−0.13R</small></td><td><span class="trust ok">방향만 참고</span></td></tr><tr><td>종합 시그널<small>적중 46~48% (기준 50%) · 점수가 높아도 더 맞지 않음</small></td><td><span class="trust bad">기준보다 낮음</span></td></tr><tr><td>실행 규칙 롱<small>4시간봉 4년: +0.47R, 무작위 진입도 +0.48R</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>보조지표 자동<small>과거로만 고른 지표의 다음 구간 성과 +0.01R</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>엘리엇 파동<small>방향 적중 ≈50% · 확신도 점수와 적중률 무관</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>구조 돌파 (AI MASTER)<small>돌파 뒤 되밀림이 더 잦음 (−2~−6%p)</small></td><td><span class="trust bad">기준보다 낮음</span></td></tr><tr><td>MA 배열·슈퍼트렌드·MACD<small>적중이 기준과 ±2%p 이내</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>지지·저항선<small>지킴률 48~51% = 1 ATR 옮긴 가짜 선과 같음</small></td><td><span class="trust rnd">무작위 수준</span></td></tr></table>
-    <div class="trust-note">2026-11-06 검증 · 이 차트 코드 그대로 · 바이낸스 8종목 × 1시간~일봉(앞·뒤 기간 나눠 확인) + 4시간봉 4년치 · 신호 다음 봉 진입 · 손절 2.5×ATR · 수수료 0.1% · 적중 기준 = 같은 기간 아무 때나 찍었을 때 · 15분봉은 모든 지표 손실 · 과거 결과이며 미래를 보장하지 않습니다</div>
+    <summary><div class="sb-ttl" style="margin-bottom:0">지표 신뢰도 · 백테스트</div><span class="trust ok" title="이 화면의 지표·신호를 차트 코드 그대로 과거 데이터에 돌린 결과. 2026-11-10 종합 시그널과 실행 규칙을 다시 만들었습니다">2개 개선 · 나머지 참고용</span></summary>
+    <table class="trust-tbl"><tr><td>종합 시그널 (방향 점수)<small>24봉 뒤 적중 52.3% · 평소 49.5% · 예전 방식 46.6%. 처음 보는 종목에서도 +2.3%p</small></td><td><span class="trust ok">기준보다 높음</span></td></tr><tr><td>실행 규칙 · 차트 타점<small>+0.27R · 무작위 진입 +0.05R · 승률 29% (크게 이기고 자주 짐)</small></td><td><span class="trust ok">기준보다 높음</span></td></tr><tr><td>과매수·과매도 (RSI·CCI·스토캐)<small>반전 방향 적중이 기준보다 +2~7%p. 반대 신호까지 들고 있으면 −0.08~−0.18R</small></td><td><span class="trust ok">방향만 참고</span></td></tr><tr><td>유동성 스윕 반전<small>적중 +1~4%p · 매매로는 −0.06~−0.13R</small></td><td><span class="trust ok">방향만 참고</span></td></tr><tr><td>보조지표 자동<small>과거로만 고른 지표의 다음 구간 성과 +0.01R</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>엘리엇 파동<small>방향 적중 ≈50% · 확신도 점수와 적중률 무관</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>구조 돌파 (AI MASTER)<small>돌파 뒤 되밀림이 더 잦음 (−2~−6%p)</small></td><td><span class="trust bad">기준보다 낮음</span></td></tr><tr><td>MA 배열·슈퍼트렌드·MACD<small>적중이 기준과 ±2%p 이내</small></td><td><span class="trust rnd">무작위 수준</span></td></tr><tr><td>지지·저항선<small>지킴률 48~51% = 1 ATR 옮긴 가짜 선과 같음</small></td><td><span class="trust rnd">무작위 수준</span></td></tr></table>
+    <div class="trust-note">위 두 줄은 2026-11-10 검증: 가중치를 정한 구간(8종목 4시간봉 2022-09~2024-10) 밖의 기간·봉·종목 96개 시계열, 그중 8종목은 마지막에 한 번만 확인. 차이가 작아(2~4%p) 단독 매매 근거로는 부족합니다. 나머지는 2026-11-06 검증 · 이 차트 코드 그대로 · 바이낸스 8종목 × 1시간~일봉(앞·뒤 기간 나눠 확인) + 4시간봉 4년치 · 신호 다음 봉 진입 · 손절 2.5×ATR · 수수료 0.1% · 적중 기준 = 같은 기간 아무 때나 찍었을 때 · 15분봉은 모든 지표 손실 · 과거 결과이며 미래를 보장하지 않습니다</div>
   </details>
   <div class="sb-sec">
     <div class="sb-ttl-row"><div class="sb-ttl" style="margin-bottom:0">지지·저항선<span class="trust rnd" title="1차 지지·저항에 닿은 뒤 지켜진 비율 48~51% — 0.5~1.5 ATR 옮긴 가짜 선(46~52%)과 같음">지킴률≈무작위</span></div><span class="sb-sel-sym" id="sbSelSym">메인</span></div>
@@ -419,7 +418,7 @@ body.light-mode .panel-tag{box-shadow:0 2px 6px rgba(30,40,90,.12);}
     <div id="futuresSource" style="margin-top:5px;font-size:10px;line-height:1.4;color:var(--tx3)">출처 확인 중</div>
   </div>
   <div class="sb-sec">
-    <div class="sb-ttl">종합 시그널<span class="trust bad" title="상승/하락 우위가 뜬 뒤 6·24봉 방향 적중 46~48% — 아무 때나 찍었을 때(50%)보다 낮음. 점수 크기와 결과도 무관">적중 46~48%</span></div>
+    <div class="sb-ttl">종합 시그널<span class="trust ok" title="우위가 뜬 봉의 24봉 뒤 방향 적중 52.3% (평소 49.5%, 예전 방식 46.6%). 학습에 쓰지 않은 기간·봉·종목으로 확인">적중 52% · 평소 49.5%</span></div>
     <div class="sig-row" id="sigRow"><span class="sig neutral">분석 중...</span></div>
   </div>
   <div class="sb-sec">
@@ -1805,45 +1804,42 @@ function renderCompositeSignal(signal, fundingRate=0){
   const cls=signal.direction==='LONG_BIAS'?'long':signal.direction==='SHORT_BIAS'?'short':'neutral';
   const icon=signal.direction==='LONG_BIAS'?'🟢':signal.direction==='SHORT_BIAS'?'🔴':'⚪';
   const signed=value=>(value>=0?'+':'')+value.toFixed(2);
-  const a=signal.axes;
-  const audit=window.COINCHART_BACKTEST;
-  const auditNumber=(value,digits=3)=>Number.isFinite(value)?value.toFixed(digits):'산출 불가';
-  // 이 전략은 Bybit 일봉만 평가했다. 차트 시간봉과 무관하게 검증 대상을 명시한다.
-  const auditTitle=audit
-    ? `Bybit USDT 무기한 일봉 · 최근 ${audit.window}확정봉 · ${audit.endExclusiveUtc.slice(0,10)} UTC 미만 · 홀드아웃 ${audit.sample}건 · 승률 ${auditNumber(audit.winRate===null?null:audit.winRate*100,1)}% · PF ${auditNumber(audit.profitFactor)} · 평균 ${auditNumber(audit.averageR)}R · 최대낙폭 ${auditNumber(audit.maxDrawdownR)}R · 진입 임계값 ${audit.threshold} · 펀딩 미포함`
-    : '백테스트 요약을 불러오지 못했습니다';
-  const auditText=audit ? `일봉 검증 ${audit.sample}건 · PF ${auditNumber(audit.profitFactor)} · ${audit.verdict}` : '검증 결과 확인 불가';
-  let html=`<span class="sig ${cls}">${icon} ${signal.label}</span>`
-    +` <span class="sig neutral" title="각 축은 -1~+1, 네 축은 동일 비중입니다">`
-    +`추세 ${signed(a.trend)} · 모멘텀 ${signed(a.momentum)} · 변동성 ${signed(a.volatility)} · 거래량 ${signed(a.volume)}</span>`
-    +` <a class="sig neutral" href="./backtest/results/signal-report.md" target="_blank" rel="noopener" title="${auditTitle}">${auditText}</a>`;
+  const k=signal.contrib;
+  // 2026-11-10 검증(사이트-백테스트-비교/upgrade-final.js): 학습에 쓰지 않은 기간·봉·종목 96개 시계열, 24봉 뒤 방향
+  const audit=signal.strength==='strong' ? '검증 적중 53.5% · 평소 49.5%'
+    : signal.strength==='weak' ? '검증 적중 52.3% · 평소 49.5%' : '관망 구간 · 평소와 같음';
+  let html=`<span class="sig ${cls}">${icon} ${signal.label} ${signed(signal.score)}</span>`
+    +` <span class="sig neutral" title="방향 점수 = 버티는 힘(RSI·MACD·슈퍼트렌드·200이평 위) + 과열 조정(너무 올랐으면 빼고 너무 내렸으면 더함: 이평 간격 벌어짐·볼린저 끝·거래량 실린 봉). ±0.20부터 약한 우위, ±0.29부터 우위">`
+    +`버티는 힘 ${signed(k.follow)} · 과열 조정 ${signed(k.stretch)}</span>`
+    +` <span class="sig neutral" title="24봉 뒤 종가가 신호 방향으로 간 비율. 바이낸스 24종목 × 1시간·4시간·12시간·일봉, 가중치를 정한 구간(8종목 4시간봉 2022-09~2024-10)은 제외. 예전 종합 점수는 같은 시험에서 46.6%. 과거 결과이며 미래를 보장하지 않습니다">${audit}</span>`;
   // 펀딩비는 방향 점수에 넣지 않고 과열 문맥으로만 보여줍니다.
   if(fundingRate>0.05) html+=' <span class="sig neutral">펀딩비 과열↑(참고)</span>';
   if(fundingRate<-0.05) html+=' <span class="sig neutral">펀딩비 과열↓(참고)</span>';
-  return html+renderTradePlan(signal,fundingRate);
+  return html+renderTradePlan(signal);
 }
 
-// 2026-10-30 백테스트에서 +0.25R로 보였던 실행 규칙. 2026-11-06 재검증 결과 같은 기간 무작위 진입(+0.48R)과 차이가 없어
-// (상승장 수익이 대부분) 화면에는 참고용으로만 표시한다.
-// 강한 우위(+0.35) + ADX14 ≥ 25 + 펀딩비 < 0.03%일 때 롱, 강한 숏 우위(−0.35)가 나올 때까지 보유, 손절 2.5×ATR, 최대 100봉.
-// 숏은 어떤 조합에서도 기대값이 0 근처라 참고로만 보여준다. 단순 추세 추종보다 낫다는 증거는 아직 없다.
+// 실행 규칙 (2026-11-10): 추세 합의(custom.js 1위 — EMA50 위·EMA20>50·슈퍼트렌드·MACD·EMA200 위 5개 일치 + ADX≥20)가
+// 새로 충족된 봉에서, 방향 점수가 같은 쪽(롱 ≥0, 숏 ≤0)일 때만 진입. 반대로 4개 이상 돌아서면 청산, 손절 2.5×ATR.
+// 학습에 쓰지 않은 96개 시계열: +0.27R(승률 29%) · 추세 합의만 +0.20R · 무작위 진입 +0.05R (upgrade-final.js [5]).
 function attachTradePlan(signal, rows){
-  if(!signal?.ready || !window.Engine || !rows?.length) return signal;
+  if(!signal?.ready || !window.Engine || !window.Custom || !rows || rows.length<210) return signal;
   const li=rows.length-1;
-  signal.plan={ adx:Engine.adx(rows,14).adx[li], atr:Engine.atr(rows,14)[li], close:rows[li].close };
+  signal.plan={ agree:Custom.LIST[0].build(rows).osc.data[li], adx:Engine.adx(rows,14).adx[li], atr:Engine.atr(rows,14)[li], close:rows[li].close };
   return signal;
 }
-function renderTradePlan(signal, fundingRate=0){
+function renderTradePlan(signal){
   const p=signal.plan;
-  if(!p) return '';
-  const s=signal.score, tip='title="2026-11-06 재검증(바이낸스 8종목 4시간봉 4년): 강한 우위 +0.35 · ADX 25 이상 롱은 무작위 진입과 같은 성과(상승기 +0.47R vs +0.48R, 하락기 −0.01R vs −0.03R) · 펀딩비 조건 제외 · 참고용"';
-  if(s<=-0.35) return ` <span class="sig neutral" ${tip}>실행 규칙: 롱 보유 중이면 청산 · 숏은 참고만</span>`;
-  if(s<0.35) return ` <span class="sig neutral" ${tip}>실행 규칙: 대기 (점수 ${s.toFixed(2)}, 롱은 +0.35부터)</span>`;
-  const why=[];
-  if(!(p.adx>=25)) why.push(`ADX ${Number.isFinite(p.adx)?p.adx.toFixed(1):'—'} &lt; 25`);
-  if(fundingRate>=0.03) why.push(`펀딩비 ${fundingRate.toFixed(3)}% ≥ 0.03%`);
-  if(why.length) return ` <span class="sig neutral" ${tip}>실행 규칙: 롱 보류 (${why.join(' · ')})</span>`;
-  return ` <span class="sig neutral" ${tip}>실행 규칙: 롱 조건 충족 · 손절 약 ${(p.close-2.5*p.atr).toFixed(dp())} · 검증상 무작위 수준</span>`;
+  if(!p || p.agree==null) return '';
+  const s=signal.score, sc=(s>=0?'+':'')+s.toFixed(2), adx=Number.isFinite(p.adx)?p.adx.toFixed(0):'—';
+  const tip='title="2026-11-10 검증(학습에 쓰지 않은 기간·봉·종목 96개 시계열, 수수료 포함): 추세 합의 + 방향 점수 같은 쪽 +0.27R · 추세 합의만 +0.20R · 무작위 진입 +0.05R. 승률 29% — 열 번 중 일곱 번은 손절이고 남은 세 번이 크게 이기는 방식. 과거 결과이며 미래를 보장하지 않습니다"';
+  const dir=p.agree===5?1:p.agree===-5?-1:0, side=dir===1?'롱':'숏';
+  if(!dir){
+    const exit=p.agree<=-3?' · 롱 보유 중이면 청산':p.agree>=3?' · 숏 보유 중이면 청산':'';
+    return ` <span class="sig neutral" ${tip}>실행 규칙: 대기 (추세 합의 ${p.agree>0?'+':''}${p.agree}/5)${exit}</span>`;
+  }
+  if(!(p.adx>=20)) return ` <span class="sig neutral" ${tip}>실행 규칙: ${side} 보류 (ADX ${adx} &lt; 20)</span>`;
+  if(dir*s<0) return ` <span class="sig neutral" ${tip}>실행 규칙: ${side} 보류 (방향 점수 ${sc} 반대)</span>`;
+  return ` <span class="sig ${dir===1?'long':'short'}" ${tip}>실행 규칙: ${side} 조건 충족 · 손절 약 ${(p.close-dir*2.5*p.atr).toFixed(dp())} · 검증 +0.27R</span>`;
 }
 
 // ── 보조지표 (trading-chart engine.js 이식) ────────────────────────────
@@ -1851,10 +1847,10 @@ function renderTradePlan(signal, fundingRate=0){
 // 그 지표의 선·매매 타점·진입/손절/목표선을 그린다. 선물이라 롱·숏 모두.
 // 봉 마감 신호 → 다음 봉 시가 체결 · 수수료 0.1% · 2.5×ATR 손절 (engine.js 규칙 그대로)
 const INDC = { buy:'#12a150', sell:'#d64545', accent:'#c96442', blue:'#5b8ff9', violet:'#8b6fd6', teal:'#2aa198', gray:'#8a857c' };
-// 매수·매도·롱·숏 타점: trade-marks.js(추세 합의 거래 기록 + 겹치지 않는 글자 배치).
+// 매수·매도·롱·숏 타점: trade-marks.js(추세 합의 거래 기록 + 겹치지 않는 글자 배치). 진입은 방향 점수가 같은 쪽일 때만(실행 규칙과 동일).
 // 메인 차트는 보조지표에서 특정 지표를 고르면 그 지표 마커로 바뀌고, 분할 차트는 항상 이 마커.
 let trendMarks = [];
-const tradeMarkers = rows => TradeMarks.tradeMarkers(rows), applyTradeMarks = (s, m, r) => TradeMarks.applyTradeMarks(s, m, r);
+const tradeMarkers = rows => TradeMarks.tradeMarkers(rows, (i, dir) => { const g = CoinAnalysis.compositeSignal(rows.slice(0, i + 1)); return g.ready && dir * g.score >= 0; }), applyTradeMarks = (s, m, r) => TradeMarks.applyTradeMarks(s, m, r);
 let indView = 'auto', adaptiveKey = '', adaptiveCache = null, adaptiveSeries = [], adaptiveLines = [];
 
 function indConfidence(st) {

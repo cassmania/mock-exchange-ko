@@ -264,7 +264,7 @@ function openTrade(el, sym, draw, pathFor) {
   ensureSymbol(sym);
   el.classList.add('wide');
   setTradeTheme();
-  el.innerHTML = `<div class="trade"><div class="trade-main"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT&v=20261107"></iframe></div><div class="trade-bottom" id="trade-bottom"></div></div><aside class="trade-side" id="trade-side"></aside></div>`;
+  el.innerHTML = `<div class="trade"><div class="trade-main"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT&v=20261110"></iframe></div><div class="trade-bottom" id="trade-bottom"></div></div><aside class="trade-side" id="trade-side"></aside></div>`;
   tradeCtx = { sym, draw, pathFor };
   draw(sym);
 }
