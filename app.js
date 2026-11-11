@@ -267,11 +267,13 @@ setTradeTheme();
 /* ---------- 판단 카드 3장(템플릿 C) ----------
    방향 점수·실행 규칙은 차트(chart/index.html)가 계산해 MOCK_CHART.signal로 넘긴 값만 그린다.
    검증 수치 출처: 사이트-백테스트-비교/results/upgrade-final.txt (2026-11-10) */
+// 자동 검증 결과(indicator-audit.js · indicator-autotune 스킬이 다시 쓴다). 없으면 아래 기본 문구가 나온다.
+const AUD = (window.INDICATOR_AUDIT && window.INDICATOR_AUDIT.text) || {};
 let lastSignal = null, judgeKey = '';
 const TF_KO = { '1m': '1분', '3m': '3분', '5m': '5분', '15m': '15분', '30m': '30분', '1h': '1시간', '2h': '2시간', '4h': '4시간', '6h': '6시간', '12h': '12시간', '1d': '일', '1w': '주', '1M': '월' };
 const TRUST_CARD = `<div class="jcard"><div class="jt">지표 신뢰도 · 백테스트</div>
-<div class="jtr"><span>종합 시그널</span><span class="chip up">기준보다 높음</span></div>
-<div class="jtr"><span>실행 규칙 · 차트 타점</span><span class="chip up">기준보다 높음</span></div>
+<div class="jtr"><span>종합 시그널</span><span class="chip ${AUD.chipCls ?? 'up'}">${AUD.chip || '기준보다 높음'}</span></div>
+<div class="jtr"><span>실행 규칙 · 차트 타점</span><span class="chip ${AUD.chipCls ?? 'up'}">${AUD.chip || '기준보다 높음'}</span></div>
 <div class="jtr"><span>과매수·과매도</span><span class="chip">방향만 참고</span></div>
 <div class="jtr"><span>파동·지지저항 등 6종</span><span class="chip">참고용</span></div>
 <p class="jfoot">과거 결과이며 미래를 보장하지 않습니다. 자세한 표는 차트 옆 ‘지표 신뢰도’.</p></div>`;
@@ -281,7 +283,7 @@ function judgeHtml(p) {
   if (!p.ready || !Number.isFinite(p.score)) return wait('확정봉이 모자라 계산할 수 없습니다.');
   const s = p.score, sg = (v, d = 2) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d);
   const cls = p.direction === 'LONG_BIAS' ? 'up' : p.direction === 'SHORT_BIAS' ? 'down' : '';
-  const hit = p.strength === 'strong' ? '53.5% · 평소 49.5%' : p.strength === 'weak' ? '52.3% · 평소 49.5%' : '관망 구간 · 평소와 같음';
+  const hit = p.strength === 'strong' ? (AUD.hitStrong || '53.5% · 평소 49.5%') : p.strength === 'weak' ? (AUD.hitWeak || '52.3% · 평소 49.5%') : '관망 구간 · 평소와 같음';
   const where = `${esc(String(p.symbol || '').replace(/USDT$/, ''))} ${TF_KO[p.tf] || esc(p.tf || '')}봉`;
   const k1 = `<div class="jcard"><div class="jt">방향 점수 · ${where} · 24봉 뒤</div>
 <div class="jrow"><span class="jbig ${cls}">${sg(s)}</span><span class="chip ${cls}">${esc(p.label || '')}</span></div>
@@ -301,7 +303,7 @@ function judgeHtml(p) {
 <div class="jrow"><span class="jstate ${ok ? (dir === 1 ? 'up' : 'down') : ''}">${ok ? side + ' 조건 충족' : dir ? side + ' 보류' : '대기'}</span><span class="chip">조건 ${n} / 3</span></div>
 <div style="margin-top:6px">${ck(c[0], `추세 합의 ${sg(pl.agree, 0)} / 5`)}${ck(c[1], `ADX ${Number.isFinite(pl.adx) ? pl.adx.toFixed(0) : '—'} (20 이상 필요)`)}${ck(c[2], '방향 점수 같은 쪽')}</div>
 ${stop ? `<div class="jkv"><span>손절 (2.5×ATR)</span><b>${stop}</b></div>` : exit ? `<div class="jkv"><span>보유 중이라면</span><b>${exit}</b></div>` : ''}
-<div class="jkv"><span>검증 기대값 · 승률 29%</span><b>+0.27R · 무작위 +0.05R</b></div></div>`;
+<div class="jkv"><span>검증 기대값 · 승률 ${AUD.win || '29%'}</span><b>${AUD.rule || '+0.27R · 무작위 +0.05R'}</b></div></div>`;
   }
   return k1 + k2 + TRUST_CARD;
 }
@@ -318,7 +320,7 @@ function openTrade(el, sym, draw, pathFor) {
   el.classList.add('wide');
   setTradeTheme();
   lastSignal = null;
-  el.innerHTML = `<section class="judge" id="judge" aria-label="신호 요약"></section><div class="trade"><div class="trade-main"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT&v=20261111"></iframe></div><div class="trade-bottom" id="trade-bottom"></div></div><aside class="trade-side" id="trade-side"></aside></div>`;
+  el.innerHTML = `<section class="judge" id="judge" aria-label="신호 요약"></section><div class="trade"><div class="trade-main"><div class="trade-chart"><iframe title="${esc(sym)} 차트" src="chart/index.html?symbol=${encodeURIComponent(sym)}USDT&v=2026111102"></iframe></div><div class="trade-bottom" id="trade-bottom"></div></div><aside class="trade-side" id="trade-side"></aside></div>`;
   tradeCtx = { sym, draw, pathFor };
   drawJudge();
   draw(sym);
