@@ -377,7 +377,7 @@ body.light-mode .panel-tag{box-shadow:0 2px 6px rgba(30,40,90,.12);}
     <div class="trust-note">위 두 줄: <span data-aud="note">2026-11-10 검증 · 가중치를 정한 구간(8종목 4시간봉 2022-09~2024-10) 밖의 기간·봉·종목 96개 시계열</span>. 차이가 작아(2~4%p) 단독 매매 근거로는 부족합니다. 나머지는 2026-11-06 검증 · 이 차트 코드 그대로 · 바이낸스 8종목 × 1시간~일봉(앞·뒤 기간 나눠 확인) + 4시간봉 4년치 · 신호 다음 봉 진입 · 손절 2.5×ATR · 수수료 0.1% · 적중 기준 = 같은 기간 아무 때나 찍었을 때 · 15분봉은 모든 지표 손실 · 과거 결과이며 미래를 보장하지 않습니다</div>
   </details>
   <div class="sb-sec">
-    <div class="sb-ttl-row"><div class="sb-ttl" style="margin-bottom:0">지지·저항선<span class="trust rnd" title="1차 지지·저항에 닿은 뒤 지켜진 비율 48~51% — 0.5~1.5 ATR 옮긴 가짜 선(46~52%)과 같음">지킴률≈무작위</span></div><span class="sb-sel-sym" id="sbSelSym">메인</span></div>
+    <div class="sb-ttl-row"><div class="sb-ttl" style="margin-bottom:0">지지·저항선<span class="trust rnd" title="1차 지지·저항에 닿은 뒤 지켜진 비율 48~51% — 0.5~1.5 ATR 옮긴 가짜 선(46~52%)과 같음. 2026-11-23 재검증: 사이트 6곳의 계산과 새 후보 5개(가까운 고저점·3회 이상 반응 군집·미돌파 고저점·매물대 봉우리·라운드 넘버)를 24종목에서 시험했으나 모두 가짜 선과 차이 없음 — 선은 참고 가격대로만 보세요">지킴률≈무작위</span></div><span class="sb-sel-sym" id="sbSelSym">메인</span></div>
     <div class="sr-list" id="srList"><div style="color:var(--b);font-size:11px">로딩 후 자동 계산</div></div>
   </div>
   <div class="sb-sec">
@@ -910,7 +910,7 @@ function renderAll() {
   if (!candles.length) return;
   const rows = getSignalRows(candles, tf);
   CS.setData(candles.map(c => ({ time:c.time, open:c.open, high:c.high, low:c.low, close:c.close })));
-  trendMarks = tradeMarkers(candles);
+  trendMarks = /^\d+m$/.test(tf) ? [] : tradeMarkers(candles);   // 30분봉 이하: 검증상 수수료로 손실 → 타점 숨김
   if (indView === 'auto') applyTradeMarks(CS, trendMarks, candles);
   updateSignalBasis(rows, tf, activeExchange);
   safeRun('이동평균선', () => doMAs(rows));
@@ -1809,8 +1809,8 @@ function renderCompositeSignal(signal, fundingRate=0){
   const signed=value=>(value>=0?'+':'')+value.toFixed(2);
   const k=signal.contrib;
   // 2026-11-10 검증(사이트-백테스트-비교/upgrade-final.js): 학습에 쓰지 않은 기간·봉·종목 96개 시계열, 24봉 뒤 방향
-  const audit=signal.strength==='strong' ? '검증 적중 '+(AUD.hitStrong||'53.5% · 평소 49.5%')
-    : signal.strength==='weak' ? '검증 적중 '+(AUD.hitWeak||'52.3% · 평소 49.5%') : '관망 구간 · 평소와 같음';
+  // 2026-11-23: '강한' 구간이 '약한' 구간보다 덜 맞아(표본 밖 새 종목 −1.3p) 두 단계를 합쳐 같은 적중률을 보여 준다
+  const audit=signal.strength!=='none' ? '검증 적중 '+(AUD.hitWeak||'52.3% · 평소 49.5%') : '관망 구간 · 평소와 같음';
   let html=`<span class="sig ${cls}">${icon} ${signal.label} ${signed(signal.score)}</span>`
     +` <span class="sig neutral" title="방향 점수 = 버티는 힘(RSI·MACD·슈퍼트렌드·200이평 위) + 과열 조정(너무 올랐으면 빼고 너무 내렸으면 더함: 이평 간격 벌어짐·볼린저 끝·거래량 실린 봉). ±0.20부터 약한 우위, ±0.29부터 우위">`
     +`버티는 힘 ${signed(k.follow)} · 과열 조정 ${signed(k.stretch)}</span>`
@@ -1818,7 +1818,7 @@ function renderCompositeSignal(signal, fundingRate=0){
   // 펀딩비는 방향 점수에 넣지 않고 과열 문맥으로만 보여줍니다.
   if(fundingRate>0.05) html+=' <span class="sig neutral">펀딩비 과열↑(참고)</span>';
   if(fundingRate<-0.05) html+=' <span class="sig neutral">펀딩비 과열↓(참고)</span>';
-  return html+renderTradePlan(signal);
+  return html+renderTradePlan(signal)+(signal.plan?` <span class="trust ${tfTrust(tf)[0]}" title="실행 규칙·차트 타점의 봉별 검증(2026-11-23, 학습에 쓰지 않은 기간·종목)">${tfTrust(tf)[1]}</span>`:'');
 }
 
 // 실행 규칙 (2026-11-10): 추세 합의(custom.js 1위 — EMA50 위·EMA20>50·슈퍼트렌드·MACD·EMA200 위 5개 일치 + ADX≥20)가
@@ -1830,6 +1830,10 @@ function attachTradePlan(signal, rows){
   signal.plan={ agree:Custom.LIST[0].build(rows).osc.data[li], adx:Engine.adx(rows,14).adx[li], atr:Engine.atr(rows,14)[li], close:rows[li].close };
   return signal;
 }
+// 2026-11-23 봉별 검증(사이트-백테스트-비교 uf-tf.js, 학습에 쓰지 않은 기간·종목, 수수료 포함):
+// 실행 규칙 4h +0.43R(무작위 +0.09R) · 1h +0.10R(t 1.6, 약함) · 12h +0.24R(무작위 +0.23R과 같음) · 1d +0.80R(149건, 무작위 범위 안) · 15분 이하는 예전 측정에서 전부 손실.
+const TF_TRUST={ '4h':['ok','4시간봉 검증됨 +0.43R · 무작위 +0.09R'], '1h':['rnd','1시간봉 검증 약함(+0.10R)'], '12h':['rnd','12시간봉 무작위와 같음'], '1d':['rnd','일봉 표본 부족(149건)'] };
+const tfTrust=t=>TF_TRUST[t]||(/^\d+m$/.test(t)?['bad','30분봉 이하 검증 미달(수수료로 손실)']:['rnd','이 봉은 검증 안 함']);
 function renderTradePlan(signal){
   const p=signal.plan;
   if(!p || p.agree==null) return '';
@@ -1842,7 +1846,7 @@ function renderTradePlan(signal){
   }
   if(!(p.adx>=20)) return ` <span class="sig neutral" ${tip}>실행 규칙: ${side} 보류 (ADX ${adx} &lt; 20)</span>`;
   if(dir*s<0) return ` <span class="sig neutral" ${tip}>실행 규칙: ${side} 보류 (방향 점수 ${sc} 반대)</span>`;
-  return ` <span class="sig ${dir===1?'long':'short'}" ${tip}>실행 규칙: ${side} 조건 충족 · 손절 약 ${(p.close-dir*2.5*p.atr).toFixed(dp())} · 검증 ${AUD.ruleShort||'+0.27R'}</span>`;
+  return ` <span class="sig ${dir===1?'long':'short'}" ${tip}>실행 규칙: ${side} 조건 충족 · 손절 약 ${(p.close-dir*2.5*p.atr).toFixed(dp())} · 승률 ${AUD.win||'29%'}(자주 손절, 가끔 크게 이김)</span>`;
 }
 
 // ── 보조지표 (trading-chart engine.js 이식) ────────────────────────────

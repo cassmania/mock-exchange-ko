@@ -607,9 +607,9 @@
     let label = '관망';
     let direction = 'WAIT';
     if (score >= DIRECTION_STRONG) { label = '상승 우위'; direction = 'LONG_BIAS'; }
-    else if (score >= DIRECTION_WEAK) { label = '약한 상승 우위'; direction = 'LONG_BIAS'; }
+    else if (score >= DIRECTION_WEAK) { label = '상승 우위'; /* 2026-11-23 강·약 합침: 강 구간이 더 맞지 않음 */ direction = 'LONG_BIAS'; }
     else if (score <= -DIRECTION_STRONG) { label = '하락 우위'; direction = 'SHORT_BIAS'; }
-    else if (score <= -DIRECTION_WEAK) { label = '약한 하락 우위'; direction = 'SHORT_BIAS'; }
+    else if (score <= -DIRECTION_WEAK) { label = '하락 우위'; direction = 'SHORT_BIAS'; }
 
     return {
       ready: true,
